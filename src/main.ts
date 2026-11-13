@@ -741,13 +741,14 @@ function renderPlaying(): void {
       <div class="timer-bar"><div class="timer-bar-fill" style="width:${pct}%"></div></div>
       <p class="hint">${remainingSec} שניות</p>
     `;
+    const sky = renderSky(pct / 100);
     if (amAsker) {
       main = `
         <h1>מי יענה נכון?</h1>
         ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
         ${questionText ? `<p class="question-text">${escapeHtml(questionText)}</p>` : ""}
         ${timerBar}
-        ${renderChoiceGrid(r.choices ?? [], null, null, true)}
+        <div class="sky-wrap">${sky}${renderChoiceGrid(r.choices ?? [], null, null, true)}</div>
         <p class="hint">${answers.length} מתוך ${Math.max(players.length - 1, 0)} ענו</p>
       `;
     } else {
@@ -757,7 +758,7 @@ function renderPlaying(): void {
         ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
         ${questionText ? `<p class="question-text">${escapeHtml(questionText)}</p>` : ""}
         ${timerBar}
-        ${renderChoiceGrid(r.choices ?? [], null, choiceIndex, choiceIndex !== null)}
+        <div class="sky-wrap">${sky}${renderChoiceGrid(r.choices ?? [], null, choiceIndex, choiceIndex !== null)}</div>
       `;
     }
   } else if (r.status === "done") {
@@ -832,6 +833,49 @@ function renderPlaying(): void {
   app.querySelector("#nextQuestion")?.addEventListener("click", async () => {
     await advanceTurn(g.code, g);
   });
+}
+
+const SKY_DAY_TOP = [110, 198, 235];
+const SKY_DAY_BOTTOM = [255, 226, 154];
+const SKY_DUSK_TOP = [91, 46, 110];
+const SKY_DUSK_BOTTOM = [255, 112, 67];
+const SKY_NIGHT_TOP = [5, 6, 26];
+const SKY_NIGHT_BOTTOM = [11, 16, 48];
+const SKY_STARS = [
+  [10, 15],
+  [25, 8],
+  [40, 20],
+  [60, 10],
+  [75, 18],
+  [88, 12],
+  [18, 32],
+  [52, 28],
+  [82, 32],
+];
+
+function lerpSkyStop(t: number, day: number[], dusk: number[], night: number[]): number[] {
+  if (t >= 0.5) {
+    const local = (t - 0.5) / 0.5;
+    return dusk.map((v, i) => Math.round(v + (day[i] - v) * local));
+  }
+  const local = t / 0.5;
+  return night.map((v, i) => Math.round(v + (dusk[i] - v) * local));
+}
+
+function renderSky(t: number): string {
+  const clamped = Math.max(0, Math.min(1, t));
+  const top = lerpSkyStop(clamped, SKY_DAY_TOP, SKY_DUSK_TOP, SKY_NIGHT_TOP);
+  const bottom = lerpSkyStop(clamped, SKY_DAY_BOTTOM, SKY_DUSK_BOTTOM, SKY_NIGHT_BOTTOM);
+  const sunOpacity = Math.max(0, Math.min(1, (clamped - 0.1) / 0.4));
+  const moonOpacity = Math.max(0, Math.min(1, (0.55 - clamped) / 0.3));
+  const bodyTop = 8 + (1 - clamped) * 60;
+  return `
+    <div class="sky-body" style="background:linear-gradient(180deg, rgb(${top.join(",")}), rgb(${bottom.join(",")}))">
+      ${SKY_STARS.map(([x, y]) => `<span class="sky-star" style="left:${x}%; top:${y}%; opacity:${moonOpacity}">✨</span>`).join("")}
+      <span class="sky-sun" style="top:${bodyTop}%; opacity:${sunOpacity}">☀️</span>
+      <span class="sky-moon" style="top:${bodyTop}%; opacity:${moonOpacity}">🌙</span>
+    </div>
+  `;
 }
 
 function renderChoiceGrid(

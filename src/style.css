@@ -509,6 +509,42 @@ ol {
   transition: width 0.25s linear;
 }
 
+.sky-wrap {
+  position: relative;
+  border-radius: 18px;
+  padding: 14px;
+  margin: 14px 0;
+  overflow: hidden;
+}
+
+.sky-body {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  transition: background 0.3s linear;
+}
+
+.sky-sun,
+.sky-moon {
+  position: absolute;
+  right: 10%;
+  font-size: 1.8rem;
+  transition: top 0.3s linear, opacity 0.3s linear;
+}
+
+.sky-star {
+  position: absolute;
+  font-size: 0.7rem;
+  transition: opacity 0.3s linear;
+}
+
+.sky-wrap .choice-grid-answers {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+}
+
 .choice-grid-answers {
   display: grid;
   grid-template-columns: 1fr 1fr;
