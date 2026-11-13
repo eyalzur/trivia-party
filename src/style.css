@@ -128,7 +128,7 @@ button.primary.big {
   margin: 12px 0;
 }
 
-.qr-wrap img {
+.qr-wrap canvas {
   width: 180px;
   height: 180px;
   border-radius: 12px;

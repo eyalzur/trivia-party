@@ -215,7 +215,8 @@ function renderLobby(): void {
     <div class="screen lobby">
       <h1>לובי</h1>
       <div class="join-code">${g.code}</div>
-      <div class="qr-wrap"><img id="qr" alt="QR להצטרפות" /></div>
+      <div class="qr-wrap"><canvas id="qr"></canvas></div>
+      <button id="shareQr" class="secondary">📤 שתפו ב-WhatsApp</button>
       <p class="hint">שתפו את הקוד או סרקו את ה-QR — שתי הדרכים מצטרפות לאותו משחק.</p>
 
       <h2>שחקנים (${players.length})</h2>
@@ -268,12 +269,45 @@ function renderLobby(): void {
   app.querySelector("#leave")!.addEventListener("click", leaveGame);
 
   const joinUrl = `${location.origin}${location.pathname}?code=${g.code}`;
-  const qrImg = app.querySelector<HTMLImageElement>("#qr")!;
-  QRCode.toDataURL(joinUrl, { margin: 1, width: 220 })
-    .then((url) => {
-      qrImg.src = url;
-    })
-    .catch(() => {});
+  const qrCanvas = app.querySelector<HTMLCanvasElement>("#qr")!;
+  QRCode.toCanvas(qrCanvas, joinUrl, { margin: 1, width: 220 }).catch(() => {});
+
+  app.querySelector("#shareQr")!.addEventListener("click", () => {
+    void shareJoinQr(qrCanvas, joinUrl, g.code);
+  });
+}
+
+async function shareJoinQr(canvas: HTMLCanvasElement, joinUrl: string, code: string): Promise<void> {
+  const text = `הצטרפו למשחק הטריוויה שלי! קוד: ${code}\n${joinUrl}`;
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+
+  if (blob && navigator.canShare) {
+    const file = new File([blob], "qr.png", { type: "image/png" });
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: "מסיבת טריוויה", text });
+        return;
+      } catch {
+        return;
+      }
+    }
+  }
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: "מסיבת טריוויה", text, url: joinUrl });
+      return;
+    } catch {
+      return;
+    }
+  }
+
+  try {
+    await navigator.clipboard.writeText(text);
+    alert("הקישור הועתק — הדביקו אותו בוואטסאפ");
+  } catch {
+    alert(joinUrl);
+  }
 }
 
 function renderPlaying(): void {
