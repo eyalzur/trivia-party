@@ -1,5 +1,6 @@
 import "./style.css";
 import QRCode from "qrcode";
+import jsQR from "jsqr";
 import { waitForUid } from "./firebase";
 import {
   createGame,
@@ -42,6 +43,10 @@ let round: RoundDoc | null = null;
 let buzzes: Buzz[] = [];
 let localQuestion: { categoryKey: string; questionId: string } | null = null;
 let joinError = "";
+
+type HomeStep = "name" | "avatar" | "choice" | "join";
+let homeStep: HomeStep = "name";
+let homeInitialized = false;
 
 let unsubGame: (() => void) | null = null;
 let unsubPlayers: (() => void) | null = null;
@@ -102,6 +107,10 @@ function leaveGame(): void {
   game = null;
   players = [];
   localStorage.removeItem(LS_CODE);
+  history.replaceState(null, "", location.pathname);
+  homeInitialized = false;
+  homeStep = "name";
+  joinError = "";
   render();
 }
 
@@ -141,40 +150,167 @@ function render(): void {
   }
 }
 
+async function attemptJoin(c: string): Promise<boolean> {
+  const existing = await getGameOnce(c);
+  if (!existing) {
+    joinError = "לא נמצא משחק עם הקוד הזה";
+    return false;
+  }
+  joinError = "";
+  await joinGame(c, myUid, myName.trim(), myAvatar);
+  history.replaceState(null, "", location.pathname);
+  setCode(c);
+  return true;
+}
+
+async function autoJoinFlow(c: string): Promise<void> {
+  app.innerHTML = `<div class="screen"><p class="hint">מצטרפים למשחק ${escapeHtml(c)}…</p></div>`;
+  const ok = await attemptJoin(c);
+  if (!ok) render();
+}
+
+function extractCode(text: string): string | null {
+  try {
+    const url = new URL(text);
+    const fromUrl = url.searchParams.get("code");
+    if (fromUrl) return fromUrl.toUpperCase();
+  } catch {
+    /* not a URL, fall through */
+  }
+  const trimmed = text.trim().toUpperCase();
+  return /^[A-Z0-9]{4,6}$/.test(trimmed) ? trimmed : null;
+}
+
+function openQrScanner(onResult: (text: string) => void): void {
+  const overlay = document.createElement("div");
+  overlay.className = "scanner-overlay";
+  overlay.innerHTML = `
+    <p>כוונו את המצלמה לקוד ה-QR</p>
+    <video playsinline muted></video>
+    <button id="cancelScan" class="secondary">ביטול</button>
+  `;
+  document.body.appendChild(overlay);
+
+  const video = overlay.querySelector("video")!;
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d")!;
+  let stream: MediaStream | null = null;
+  let rafId = 0;
+  let stopped = false;
+
+  function stop(): void {
+    stopped = true;
+    cancelAnimationFrame(rafId);
+    stream?.getTracks().forEach((t) => t.stop());
+    overlay.remove();
+  }
+
+  overlay.querySelector("#cancelScan")!.addEventListener("click", stop);
+
+  function tick(): void {
+    if (stopped) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const result = jsQR(imageData.data, imageData.width, imageData.height);
+      if (result?.data) {
+        stop();
+        onResult(result.data);
+        return;
+      }
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  navigator.mediaDevices
+    .getUserMedia({ video: { facingMode: "environment" } })
+    .then((s) => {
+      if (stopped) {
+        s.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      stream = s;
+      video.srcObject = s;
+      void video.play();
+      rafId = requestAnimationFrame(tick);
+    })
+    .catch(() => {
+      stop();
+      alert("לא ניתן לגשת למצלמה");
+    });
+}
+
 function renderHome(): void {
-  const urlCode = new URLSearchParams(location.search).get("code") ?? "";
+  const urlCode = new URLSearchParams(location.search).get("code")?.toUpperCase() ?? "";
+
+  if (!homeInitialized) {
+    homeInitialized = true;
+    if (myName.trim() && urlCode) {
+      homeStep = "join";
+      void autoJoinFlow(urlCode);
+      return;
+    }
+    homeStep = myName.trim() ? "choice" : "name";
+  }
+
+  if (homeStep === "name") return renderStepName();
+  if (homeStep === "avatar") return renderStepAvatar(urlCode);
+  if (homeStep === "choice") return renderStepChoice();
+  return renderStepJoin(urlCode);
+}
+
+function renderStepName(): void {
   app.innerHTML = `
     <div class="screen home">
-      <h1>🎉 מסיבת טריוויה</h1>
-      <label>השם שלך</label>
-      <input id="name" maxlength="20" value="${escapeHtml(myName)}" placeholder="לדוגמה: דנה" />
-
-      <label>בחרו אווטאר</label>
-      <div class="avatar-picker">
-        ${AVATARS.map(
-          (a) => `<button class="avatar-choice${a === myAvatar ? " selected" : ""}" data-avatar="${a}">${a}</button>`,
-        ).join("")}
-      </div>
-
-      <div class="card">
-        <h2>התחילו משחק חדש</h2>
-        <button id="create">צור משחק</button>
-      </div>
-
-      <div class="card">
-        <h2>הצטרפו למשחק</h2>
-        <input id="joinCode" maxlength="5" value="${escapeHtml(urlCode)}" placeholder="קוד" class="code-input" />
-        <button id="join">הצטרף</button>
-        ${joinError ? `<p class="error">${escapeHtml(joinError)}</p>` : ""}
+      <div class="wizard">
+        <h1>🎉 מסיבת טריוויה</h1>
+        <div class="progress-dots"><span class="active"></span><span></span><span></span></div>
+        <label>איך קוראים לך?</label>
+        <input id="name" maxlength="20" value="${escapeHtml(myName)}" placeholder="לדוגמה: דנה" />
+        <button id="next" ${myName.trim() ? "" : "disabled"}>הבא</button>
       </div>
     </div>
   `;
 
-  const nameInput = app.querySelector<HTMLInputElement>("#name")!;
-  nameInput.addEventListener("input", () => {
-    myName = nameInput.value;
+  const input = app.querySelector<HTMLInputElement>("#name")!;
+  const nextBtn = app.querySelector<HTMLButtonElement>("#next")!;
+  input.addEventListener("input", () => {
+    myName = input.value;
     localStorage.setItem(LS_NAME, myName);
+    nextBtn.disabled = !myName.trim();
   });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && myName.trim()) {
+      homeStep = "avatar";
+      render();
+    }
+  });
+  nextBtn.addEventListener("click", () => {
+    if (!myName.trim()) return;
+    homeStep = "avatar";
+    render();
+  });
+}
+
+function renderStepAvatar(urlCode: string): void {
+  app.innerHTML = `
+    <div class="screen home">
+      <div class="wizard">
+        <div class="progress-dots"><span></span><span class="active"></span><span></span></div>
+        <div class="avatar-big">${myAvatar}</div>
+        <h1>בחרו אווטאר, ${escapeHtml(myName)}</h1>
+        <div class="avatar-picker">
+          ${AVATARS.map(
+            (a) => `<button class="avatar-choice${a === myAvatar ? " selected" : ""}" data-avatar="${a}">${a}</button>`,
+          ).join("")}
+        </div>
+        <button id="next">הבא</button>
+        <button id="back" class="secondary">חזרה</button>
+      </div>
+    </div>
+  `;
 
   app.querySelectorAll<HTMLButtonElement>(".avatar-choice").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -183,29 +319,84 @@ function renderHome(): void {
       render();
     });
   });
+  app.querySelector("#back")!.addEventListener("click", () => {
+    homeStep = "name";
+    render();
+  });
+  app.querySelector("#next")!.addEventListener("click", () => {
+    if (urlCode) {
+      void autoJoinFlow(urlCode);
+    } else {
+      homeStep = "choice";
+      render();
+    }
+  });
+}
+
+function renderStepChoice(): void {
+  app.innerHTML = `
+    <div class="screen home">
+      <div class="wizard">
+        <div class="avatar-big">${myAvatar}</div>
+        <h1>היי ${escapeHtml(myName)}!</h1>
+        <div class="choice-grid">
+          <button id="create" class="choice-card create"><span class="icon">🎉</span><span>צור משחק חדש</span></button>
+          <button id="toJoin" class="choice-card join"><span class="icon">🔑</span><span>הצטרף למשחק</span></button>
+        </div>
+        <button id="editProfile" class="secondary">✏️ שם / אווטאר</button>
+      </div>
+    </div>
+  `;
 
   app.querySelector("#create")!.addEventListener("click", async () => {
-    if (!myName.trim()) return alert("קודם תכניסו שם");
     const c = await createGame(myUid, myName.trim(), myAvatar);
     history.replaceState(null, "", location.pathname);
     setCode(c);
   });
+  app.querySelector("#toJoin")!.addEventListener("click", () => {
+    homeStep = "join";
+    render();
+  });
+  app.querySelector("#editProfile")!.addEventListener("click", () => {
+    homeStep = "name";
+    render();
+  });
+}
 
+function renderStepJoin(urlCode: string): void {
+  app.innerHTML = `
+    <div class="screen home">
+      <div class="wizard">
+        <h1>הצטרפות למשחק</h1>
+        <input id="joinCode" maxlength="5" value="${escapeHtml(urlCode)}" placeholder="קוד" class="code-input" />
+        <button id="join">הצטרף</button>
+        <button id="scan" class="scan-btn">📷 סרקו קוד QR</button>
+        ${joinError ? `<p class="error">${escapeHtml(joinError)}</p>` : ""}
+        <button id="back" class="secondary">חזרה</button>
+      </div>
+    </div>
+  `;
+
+  app.querySelector("#back")!.addEventListener("click", () => {
+    joinError = "";
+    homeStep = "choice";
+    render();
+  });
   app.querySelector("#join")!.addEventListener("click", async () => {
-    if (!myName.trim()) return alert("קודם תכניסו שם");
     const input = app.querySelector<HTMLInputElement>("#joinCode")!;
     const c = input.value.trim().toUpperCase();
     if (!c) return;
-    const existing = await getGameOnce(c);
-    if (!existing) {
-      joinError = "לא נמצא משחק עם הקוד הזה";
-      render();
-      return;
-    }
-    joinError = "";
-    await joinGame(c, myUid, myName.trim(), myAvatar);
-    history.replaceState(null, "", location.pathname);
-    setCode(c);
+    const ok = await attemptJoin(c);
+    if (!ok) render();
+  });
+  app.querySelector("#scan")!.addEventListener("click", () => {
+    openQrScanner((text) => {
+      const c = extractCode(text);
+      if (!c) return;
+      void attemptJoin(c).then((ok) => {
+        if (!ok) render();
+      });
+    });
   });
 }
 

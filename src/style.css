@@ -1,10 +1,14 @@
 :root {
-  --bg: #16181d;
-  --card: #22252c;
-  --accent: #ff5c5c;
+  --bg: #15121f;
+  --bg2: #1f1333;
+  --card: #241b38;
+  --card2: #2d2147;
+  --accent: #ff5c8a;
+  --accent-grad: linear-gradient(135deg, #ff5c8a, #ff8a5c);
   --accent2: #4cd6b4;
-  --text: #f2f2f2;
-  --muted: #9a9ea6;
+  --accent2-grad: linear-gradient(135deg, #4cd6b4, #45b3e0);
+  --text: #f5f3fa;
+  --muted: #a69bc2;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: dark;
 }
@@ -15,7 +19,8 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: radial-gradient(circle at 50% 0%, var(--bg2), var(--bg) 60%);
+  background-attachment: fixed;
   color: var(--text);
   min-height: 100vh;
 }
@@ -28,8 +33,9 @@ body {
 }
 
 h1 {
-  font-size: 1.4rem;
+  font-size: 1.5rem;
   margin: 0 0 8px;
+  font-weight: 800;
 }
 
 h2 {
@@ -49,13 +55,18 @@ h2 {
 
 input {
   width: 100%;
-  padding: 12px;
+  padding: 13px;
   font-size: 1.1rem;
-  border-radius: 10px;
-  border: 1px solid #3a3d44;
-  background: #1c1e24;
+  border-radius: 12px;
+  border: 1px solid #3a3151;
+  background: #1a1428;
   color: var(--text);
   margin: 6px 0 12px;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--accent2);
 }
 
 .code-input {
@@ -67,60 +78,155 @@ input {
 
 button {
   width: 100%;
-  padding: 14px;
+  padding: 15px;
   font-size: 1.1rem;
-  font-weight: 600;
-  border-radius: 12px;
+  font-weight: 700;
+  border-radius: 14px;
   border: none;
-  background: var(--accent2);
-  color: #0b1d17;
+  background: var(--accent2-grad);
+  color: #07231c;
   margin: 6px 0;
   cursor: pointer;
+  box-shadow: 0 6px 16px -6px rgba(76, 214, 180, 0.5);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+button:active {
+  transform: scale(0.97);
+  box-shadow: none;
 }
 
 button:disabled {
   opacity: 0.4;
+  box-shadow: none;
 }
 
 button.secondary {
   background: transparent;
-  border: 1px solid #3a3d44;
+  border: 1px solid #3a3151;
   color: var(--text);
+  box-shadow: none;
 }
 
 button.primary.big {
-  background: var(--accent);
+  background: var(--accent-grad);
   color: white;
   font-size: 1.3rem;
   padding: 20px;
+  box-shadow: 0 8px 20px -6px rgba(255, 92, 138, 0.55);
 }
 
 .card {
-  background: var(--card);
-  border-radius: 14px;
-  padding: 16px;
+  background: linear-gradient(160deg, var(--card2), var(--card));
+  border-radius: 18px;
+  padding: 18px;
   margin: 16px 0;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.wizard {
+  animation: fade-in 0.25s ease;
+  text-align: center;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.progress-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 4px 0 20px;
+}
+
+.progress-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #3a3151;
+  transition: all 0.2s ease;
+}
+
+.progress-dots span.active {
+  width: 22px;
+  background: var(--accent2-grad);
 }
 
 .avatar-picker {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 12px;
+  justify-content: center;
 }
 
 .avatar-choice {
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   flex-shrink: 0;
   padding: 0;
-  font-size: 1.6rem;
-  background: #2b2e36;
-  border-radius: 10px;
+  font-size: 1.8rem;
+  background: var(--card2);
+  border-radius: 16px;
+  box-shadow: none;
+  transition: transform 0.12s ease, outline-color 0.12s ease;
 }
 
 .avatar-choice.selected {
-  outline: 2px solid var(--accent2);
+  outline: 3px solid var(--accent2);
+  transform: scale(1.1);
+  background: var(--card);
+}
+
+.avatar-big {
+  font-size: 4rem;
+  line-height: 1;
+  margin: 8px 0 4px;
+}
+
+.choice-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.choice-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: right;
+  padding: 20px;
+  font-size: 1.15rem;
+}
+
+.choice-card .icon {
+  font-size: 2rem;
+}
+
+.choice-card.create {
+  background: var(--accent-grad);
+  color: white;
+  box-shadow: 0 8px 20px -6px rgba(255, 92, 138, 0.5);
+}
+
+.choice-card.join {
+  background: var(--accent2-grad);
+  color: #07231c;
+}
+
+.scan-btn {
+  background: var(--card2);
+  color: var(--text);
+  border: 1px dashed var(--accent2);
 }
 
 .qr-wrap {
@@ -131,9 +237,10 @@ button.primary.big {
 .qr-wrap canvas {
   width: 180px;
   height: 180px;
-  border-radius: 12px;
+  border-radius: 16px;
   background: white;
   padding: 8px;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
 }
 
 .join-code {
@@ -141,9 +248,39 @@ button.primary.big {
   font-weight: bold;
   letter-spacing: 0.15em;
   text-align: center;
-  background: var(--card);
-  border-radius: 14px;
-  padding: 16px;
+  background: linear-gradient(160deg, var(--card2), var(--card));
+  border-radius: 18px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.scanner-overlay {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.scanner-overlay video {
+  width: min(85vw, 340px);
+  height: min(85vw, 340px);
+  object-fit: cover;
+  border-radius: 20px;
+  border: 3px solid var(--accent2);
+}
+
+.scanner-overlay button {
+  width: auto;
+  padding: 12px 28px;
+}
+
+.scanner-overlay p {
+  color: var(--text);
 }
 
 ul,
