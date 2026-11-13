@@ -1038,6 +1038,26 @@ button.secondary.small {
 
 .choice-btn.reveal-wrong {
   opacity: 0.45;
+  animation: wrong-shake 0.4s ease;
+}
+
+@keyframes wrong-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-8px);
+  }
+  40% {
+    transform: translateX(7px);
+  }
+  60% {
+    transform: translateX(-5px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
 }
 
 @keyframes correct-bounce {
@@ -1145,18 +1165,34 @@ button.secondary.small {
 
 .confetti-piece {
   position: absolute;
-  top: -12px;
   width: 8px;
   height: 14px;
   border-radius: 2px;
-  transform: rotate(var(--rot, 0deg));
-  animation: confetti-fall linear forwards;
+  margin: -7px 0 0 -4px;
+  transform: translate(0, 0) rotate(0deg) scale(1);
+  animation: confetti-burst ease-out forwards;
 }
 
-@keyframes confetti-fall {
-  to {
-    transform: translateY(110vh) rotate(calc(var(--rot, 0deg) + 480deg));
-    opacity: 0.85;
+.confetti-piece.emoji {
+  width: auto;
+  height: auto;
+  margin: -10px 0 0 -10px;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+@keyframes confetti-burst {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  40% {
+    transform: translate(var(--tx), var(--ty)) rotate(calc(var(--rot) * 0.5)) scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--tx), calc(var(--ty) + 220px)) rotate(var(--rot)) scale(0.6);
+    opacity: 0;
   }
 }
 

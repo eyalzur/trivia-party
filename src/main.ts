@@ -64,6 +64,8 @@ let currentQuestionDurationMs = QUESTION_DURATION_MS;
 let joinError = "";
 let celebratedThisRound = false;
 let prevMyScoreTop: number | null = null;
+let celebratedMyPointsRound = -1;
+let celebratedEndedGame = "";
 
 type HomeStep = "profile" | "gameName" | "join";
 let homeStep: HomeStep = "profile";
@@ -98,6 +100,7 @@ function teardownRound(): void {
   questionEndTriggered = false;
   currentQuestionDurationMs = QUESTION_DURATION_MS;
   celebratedThisRound = false;
+  celebratedMyPointsRound = -1;
   stopQuestionTimer();
 }
 
@@ -207,22 +210,40 @@ function escapeHtml(s: string): string {
   return div.innerHTML;
 }
 
-function fireConfetti(): void {
+const CONFETTI_EMOJI = ["🎉", "✨", "⭐", "🎊"];
+
+function fireConfetti(
+  originX: number = window.innerWidth / 2,
+  originY: number = window.innerHeight * 0.3,
+  count = 80,
+): void {
   const layer = document.createElement("div");
   layer.className = "confetti-layer";
-  const colors = ["#ff5c8a", "#ff8a5c", "#4cd6b4", "#45b3e0", "#ffd24c"];
-  for (let i = 0; i < 70; i++) {
+  const colors = ["#ff5c8a", "#ff8a5c", "#4cd6b4", "#45b3e0", "#ffd24c", "#c084fc"];
+  for (let i = 0; i < count; i++) {
     const piece = document.createElement("span");
-    piece.className = "confetti-piece";
-    piece.style.left = `${Math.random() * 100}%`;
-    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
-    piece.style.animationDelay = `${Math.random() * 0.3}s`;
-    piece.style.animationDuration = `${1.1 + Math.random() * 0.9}s`;
-    piece.style.setProperty("--rot", `${Math.random() * 360}deg`);
+    const isEmoji = i % 6 === 0;
+    piece.className = `confetti-piece${isEmoji ? " emoji" : ""}`;
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 50 + Math.random() * 170;
+    const tx = Math.cos(angle) * dist;
+    const ty = Math.sin(angle) * dist * 0.7 - 30;
+    piece.style.left = `${originX}px`;
+    piece.style.top = `${originY}px`;
+    piece.style.setProperty("--tx", `${tx}px`);
+    piece.style.setProperty("--ty", `${ty}px`);
+    piece.style.setProperty("--rot", `${Math.random() * 720 - 360}deg`);
+    piece.style.animationDelay = `${Math.random() * 0.15}s`;
+    piece.style.animationDuration = `${0.9 + Math.random() * 0.7}s`;
+    if (isEmoji) {
+      piece.textContent = CONFETTI_EMOJI[Math.floor(Math.random() * CONFETTI_EMOJI.length)];
+    } else {
+      piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    }
     layer.appendChild(piece);
   }
   document.body.appendChild(layer);
-  setTimeout(() => layer.remove(), 2300);
+  setTimeout(() => layer.remove(), 2200);
 }
 
 type TextAnim = "drop" | "write" | "explode";
@@ -962,7 +983,7 @@ function renderPlaying(): void {
       <h1>${amAsker ? "התוצאות!" : `${tagOf(r.askerUid)} שאל/ה`}</h1>
       ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
       ${questionText ? `<p class="question-text">${escapeHtml(questionText)}</p>` : ""}
-      ${myEarnedPts > 0 ? `<div class="points-burst">+${myEarnedPts} 🎉</div>` : ""}
+      ${myEarnedPts > 0 ? `<div class="points-burst" id="pointsBurst">+${myEarnedPts} 🎉</div>` : ""}
       ${renderChoiceGrid(r.choices ?? [], r.correctIndex, myAnswer ? myAnswer.choiceIndex : null, true, undefined, true)}
       ${renderAnswerResults(answers, r.correctIndex)}
       ${
@@ -991,6 +1012,12 @@ function renderPlaying(): void {
   if (myScoreTopEl) {
     if (prevMyScoreTop !== null && prevMyScoreTop !== myScore) animateNumber(myScoreTopEl, prevMyScoreTop, myScore);
     prevMyScoreTop = myScore;
+  }
+  const pointsBurstEl = document.getElementById("pointsBurst");
+  if (pointsBurstEl && celebratedMyPointsRound !== g.turnIndex) {
+    celebratedMyPointsRound = g.turnIndex;
+    const rect = pointsBurstEl.getBoundingClientRect();
+    fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2, 36);
   }
 
   app.querySelectorAll<HTMLButtonElement>(".pick-category").forEach((btn) => {
@@ -1157,6 +1184,13 @@ function renderEnded(): void {
   `;
   maybeAnimateHeading(`ended:${game?.code ?? ""}`, ".ended h1", "drop");
   app.querySelector("#again")!.addEventListener("click", leaveGame);
+  const gameKey = game?.code ?? "";
+  if (gameKey && celebratedEndedGame !== gameKey) {
+    celebratedEndedGame = gameKey;
+    fireConfetti(window.innerWidth * 0.3, window.innerHeight * 0.25, 70);
+    setTimeout(() => fireConfetti(window.innerWidth * 0.7, window.innerHeight * 0.25, 70), 220);
+    setTimeout(() => fireConfetti(window.innerWidth * 0.5, window.innerHeight * 0.18, 60), 440);
+  }
 }
 
 function initAmbientBackground(): void {
