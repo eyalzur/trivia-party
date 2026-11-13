@@ -658,6 +658,23 @@ ol {
   animation-delay: 0.15s;
 }
 
+.choice-btn.scan {
+  animation: choice-pop 0.3s ease backwards, scan-glow 2.4s ease-in-out infinite;
+}
+
+@keyframes scan-glow {
+  0%,
+  20%,
+  100% {
+    box-shadow: none;
+    transform: scale(1);
+  }
+  6% {
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9), 0 0 18px 4px rgba(255, 255, 255, 0.45);
+    transform: scale(1.03);
+  }
+}
+
 @keyframes choice-pop {
   from {
     opacity: 0;

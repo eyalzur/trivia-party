@@ -819,7 +819,7 @@ function renderPlaying(): void {
         ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
         ${questionText ? `<p class="question-text">${escapeHtml(questionText)}</p>` : ""}
         ${timerBar}
-        <div class="sky-wrap">${sky}${renderChoiceGrid(r.choices ?? [], null, choiceIndex, choiceIndex !== null)}</div>
+        <div class="sky-wrap">${sky}${renderChoiceGrid(r.choices ?? [], null, choiceIndex, choiceIndex !== null, elapsed)}</div>
       `;
     }
   } else if (r.status === "done") {
@@ -953,6 +953,7 @@ function renderChoiceGrid(
   correctIndex: number | null,
   selectedIndex: number | null,
   disabled: boolean,
+  liveElapsedMs?: number,
 ): string {
   if (!choices.length) return "";
   return `
@@ -962,16 +963,21 @@ function renderChoiceGrid(
           const isCorrect = correctIndex !== null && i === correctIndex;
           const isWrongPick = correctIndex !== null && selectedIndex === i && i !== correctIndex;
           const isSelected = selectedIndex === i;
+          const isLive = liveElapsedMs !== undefined && !disabled;
           const classes = [
             "choice-btn",
             CHOICE_CLASSES[i],
             isCorrect ? "reveal-correct" : "",
             isWrongPick ? "reveal-wrong" : "",
             isSelected && correctIndex === null ? "picked" : "",
+            isLive ? "scan" : "",
           ]
             .filter(Boolean)
             .join(" ");
-          return `<button class="${classes}" data-index="${i}" ${disabled ? "disabled" : ""}>
+          const scanStyle = isLive
+            ? ` style="animation-delay:${i * 0.05}s, -${(((liveElapsedMs ?? 0) / 1000 + i * 0.6) % 2.4).toFixed(3)}s"`
+            : "";
+          return `<button class="${classes}" data-index="${i}" ${disabled ? "disabled" : ""}${scanStyle}>
             <span class="choice-letter">${CHOICE_LETTERS[i]}</span><span>${escapeHtml(text)}</span>
           </button>`;
         })
