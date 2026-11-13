@@ -35,6 +35,7 @@ const AVATARS = [
 let myUid = "";
 let myName = localStorage.getItem(LS_NAME) ?? "";
 let myAvatar = localStorage.getItem(LS_AVATAR) ?? AVATARS[0];
+let hadSavedPlayer = !!myName.trim();
 
 let code: string | null = localStorage.getItem(LS_CODE);
 let game: GameDoc | null = null;
@@ -45,8 +46,8 @@ let localQuestion: { categoryKey: string; questionId: string } | null = null;
 let joinError = "";
 let celebratedUids = new Set<string>();
 
-type HomeStep = "name" | "avatar" | "choice" | "gameName" | "join";
-let homeStep: HomeStep = "name";
+type HomeStep = "profile" | "gameName" | "join";
+let homeStep: HomeStep = "profile";
 let homeInitialized = false;
 let joinAutoOpenCamera = false;
 
@@ -118,7 +119,7 @@ function leaveGame(): void {
   localStorage.removeItem(LS_CODE);
   history.replaceState(null, "", location.pathname);
   homeInitialized = false;
-  homeStep = "name";
+  homeStep = "profile";
   joinError = "";
   render();
 }
@@ -334,66 +335,56 @@ function renderHome(): void {
       void autoJoinFlow(urlCode);
       return;
     }
-    homeStep = myName.trim() ? "choice" : "name";
+    homeStep = "profile";
   }
 
-  if (homeStep === "name") return renderStepName();
-  if (homeStep === "avatar") return renderStepAvatar(urlCode);
-  if (homeStep === "choice") return renderStepChoice();
+  if (homeStep === "profile") return renderStepProfile();
   if (homeStep === "gameName") return renderStepGameName();
   return renderStepJoin(urlCode);
 }
 
-function renderStepName(): void {
+function renderStepProfile(): void {
+  const canProceed = !!myName.trim();
   app.innerHTML = `
     <div class="screen home">
       <div class="wizard">
         <h1>🎉 מסיבת טריוויה</h1>
-        <div class="progress-dots"><span class="active"></span><span></span><span></span></div>
-        <label>איך קוראים לך?</label>
+        <label>השם שלך</label>
         <input id="name" maxlength="20" value="${escapeHtml(myName)}" placeholder="לדוגמה: דנה" />
-        <button id="next" ${myName.trim() ? "" : "disabled"}>הבא</button>
-      </div>
-    </div>
-  `;
-
-  const input = app.querySelector<HTMLInputElement>("#name")!;
-  const nextBtn = app.querySelector<HTMLButtonElement>("#next")!;
-  input.addEventListener("input", () => {
-    myName = input.value;
-    localStorage.setItem(LS_NAME, myName);
-    nextBtn.disabled = !myName.trim();
-  });
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && myName.trim()) {
-      homeStep = "avatar";
-      render();
-    }
-  });
-  nextBtn.addEventListener("click", () => {
-    if (!myName.trim()) return;
-    homeStep = "avatar";
-    render();
-  });
-}
-
-function renderStepAvatar(urlCode: string): void {
-  app.innerHTML = `
-    <div class="screen home">
-      <div class="wizard">
-        <div class="progress-dots"><span></span><span class="active"></span><span></span></div>
-        <div class="avatar-big">${myAvatar}</div>
-        <h1>בחרו אווטאר, ${escapeHtml(myName)}</h1>
+        <label>בחרו אווטאר</label>
         <div class="avatar-picker">
           ${AVATARS.map(
             (a) => `<button class="avatar-choice${a === myAvatar ? " selected" : ""}" data-avatar="${a}">${a}</button>`,
           ).join("")}
         </div>
-        <button id="next">הבא</button>
-        <button id="back" class="secondary">חזרה</button>
+        <div class="choice-grid">
+          <button id="saveProfile" class="choice-card profile" ${canProceed ? "" : "disabled"}>
+            <span class="icon">🧑</span><span>${hadSavedPlayer ? "עדכן שחקן" : "צור שחקן"}</span>
+          </button>
+          <button id="startGame" class="choice-card create" ${canProceed ? "" : "disabled"}>
+            <span class="icon">🎉</span><span>התחל משחק</span>
+          </button>
+          <button id="toJoin" class="choice-card join" ${canProceed ? "" : "disabled"}>
+            <span class="icon">📷</span><span>הצטרף למשחק</span>
+          </button>
+        </div>
       </div>
     </div>
   `;
+
+  const input = app.querySelector<HTMLInputElement>("#name")!;
+  const saveBtn = app.querySelector<HTMLButtonElement>("#saveProfile")!;
+  const startBtn = app.querySelector<HTMLButtonElement>("#startGame")!;
+  const joinBtn = app.querySelector<HTMLButtonElement>("#toJoin")!;
+
+  input.addEventListener("input", () => {
+    myName = input.value;
+    localStorage.setItem(LS_NAME, myName);
+    const ok = !!myName.trim();
+    saveBtn.disabled = !ok;
+    startBtn.disabled = !ok;
+    joinBtn.disabled = !ok;
+  });
 
   app.querySelectorAll<HTMLButtonElement>(".avatar-choice").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -402,46 +393,23 @@ function renderStepAvatar(urlCode: string): void {
       render();
     });
   });
-  app.querySelector("#back")!.addEventListener("click", () => {
-    homeStep = "name";
+
+  saveBtn.addEventListener("click", () => {
+    if (!myName.trim()) return;
+    localStorage.setItem(LS_NAME, myName);
+    localStorage.setItem(LS_AVATAR, myAvatar);
+    hadSavedPlayer = true;
     render();
   });
-  app.querySelector("#next")!.addEventListener("click", () => {
-    if (urlCode) {
-      void autoJoinFlow(urlCode);
-    } else {
-      homeStep = "choice";
-      render();
-    }
-  });
-}
-
-function renderStepChoice(): void {
-  app.innerHTML = `
-    <div class="screen home">
-      <div class="wizard">
-        <div class="avatar-big">${myAvatar}</div>
-        <h1>היי ${escapeHtml(myName)}!</h1>
-        <div class="choice-grid">
-          <button id="create" class="choice-card create"><span class="icon">🎉</span><span>משחק חדש</span></button>
-          <button id="toJoin" class="choice-card join"><span class="icon">📷</span><span>הצטרף למשחק</span></button>
-          <button id="editProfile" class="choice-card profile"><span class="icon">🧑</span><span>פרופיל</span></button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  app.querySelector("#create")!.addEventListener("click", () => {
+  startBtn.addEventListener("click", () => {
+    if (!myName.trim()) return;
     homeStep = "gameName";
     render();
   });
-  app.querySelector("#toJoin")!.addEventListener("click", () => {
+  joinBtn.addEventListener("click", () => {
+    if (!myName.trim()) return;
     joinAutoOpenCamera = true;
     homeStep = "join";
-    render();
-  });
-  app.querySelector("#editProfile")!.addEventListener("click", () => {
-    homeStep = "name";
     render();
   });
 }
@@ -461,7 +429,7 @@ function renderStepGameName(): void {
   `;
 
   app.querySelector("#back")!.addEventListener("click", () => {
-    homeStep = "choice";
+    homeStep = "profile";
     render();
   });
   app.querySelector("#createNow")!.addEventListener("click", async () => {
@@ -490,7 +458,7 @@ function renderStepJoin(urlCode: string): void {
 
   app.querySelector("#back")!.addEventListener("click", () => {
     joinError = "";
-    homeStep = "choice";
+    homeStep = "profile";
     render();
   });
   app.querySelector("#join")!.addEventListener("click", async () => {
