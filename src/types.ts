@@ -9,6 +9,7 @@ export interface GameDoc {
   topics: string[];
   order: string[];
   turnIndex: number;
+  usedQuestions: string[];
   createdAt: unknown;
 }
 
@@ -21,7 +22,8 @@ export interface PlayerDoc {
 
 export interface RoundDoc {
   askerUid: string;
-  topic: string | null;
+  categoryKey: string | null;
+  questionId: string | null;
   status: RoundStatus;
   openedAt: unknown | null;
 }

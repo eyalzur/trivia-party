@@ -17,6 +17,7 @@ import {
   submitBuzz,
 } from "./game";
 import type { Buzz, GameDoc, Player, RoundDoc } from "./types";
+import { CATEGORIES, getCategory, getQuestion, pickRandomQuestion } from "./questions";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
@@ -39,7 +40,7 @@ let game: GameDoc | null = null;
 let players: Player[] = [];
 let round: RoundDoc | null = null;
 let buzzes: Buzz[] = [];
-let localTopicChoice: string | null = null;
+let localQuestion: { categoryKey: string; questionId: string } | null = null;
 let joinError = "";
 
 let unsubGame: (() => void) | null = null;
@@ -76,7 +77,7 @@ function watchGame(c: string): void {
     }
     if (g.status === "playing" && g.turnIndex !== lastTurnIndex) {
       lastTurnIndex = g.turnIndex;
-      localTopicChoice = null;
+      localQuestion = null;
       teardownRound();
       unsubRound = subscribeRound(c, g.turnIndex, (r) => {
         round = r;
@@ -224,23 +225,30 @@ function renderLobby(): void {
         ${players.map((p) => `<li>${p.avatar} ${escapeHtml(p.name)}${p.uid === g.hostUid ? " 👑" : ""}</li>`).join("")}
       </ul>
 
-      <h2>נושאים</h2>
-      <ul class="topics">
-        ${g.topics
-          .map(
-            (t, i) =>
-              `<li>${escapeHtml(t)}${isHost ? `<button data-idx="${i}" class="remove-topic">✕</button>` : ""}</li>`,
-          )
-          .join("") || "<li class='muted'>עדיין אין נושאים</li>"}
-      </ul>
+      <h2>קטגוריות</h2>
       ${
         isHost
-          ? `<div class="add-topic">
-              <input id="newTopic" placeholder="לדוגמה: סרטים" maxlength="30" />
-              <button id="addTopic">הוסף</button>
-            </div>
-            <button id="startGame" ${players.length < 2 ? "disabled" : ""}>התחל משחק</button>
-            ${players.length < 2 ? "<p class='hint'>צריך לפחות 2 שחקנים</p>" : ""}`
+          ? `<ul class="categories">
+              ${CATEGORIES.map(
+                (c) => `<li>
+                  <label>
+                    <input type="checkbox" class="category-choice" value="${c.key}" ${g.topics.includes(c.key) ? "checked" : ""} />
+                    ${escapeHtml(c.label)} <span class="muted">(${c.questions.length} שאלות)</span>
+                  </label>
+                </li>`,
+              ).join("")}
+            </ul>`
+          : `<ul class="categories">
+              ${g.topics.length
+                ? g.topics.map((key) => `<li>${escapeHtml(getCategory(key)?.label ?? key)}</li>`).join("")
+                : "<li class='muted'>המארח עדיין לא בחר קטגוריות</li>"}
+            </ul>`
+      }
+      ${
+        isHost
+          ? `<button id="startGame" ${players.length < 2 || g.topics.length < 1 ? "disabled" : ""}>התחל משחק</button>
+            ${players.length < 2 ? "<p class='hint'>צריך לפחות 2 שחקנים</p>" : ""}
+            ${g.topics.length < 1 ? "<p class='hint'>בחרו לפחות קטגוריה אחת</p>" : ""}`
           : "<p class='hint'>ממתינים שהמארח יתחיל…</p>"
       }
       <button id="leave" class="secondary">עזוב</button>
@@ -248,16 +256,11 @@ function renderLobby(): void {
   `;
 
   if (isHost) {
-    app.querySelector("#addTopic")!.addEventListener("click", async () => {
-      const input = app.querySelector<HTMLInputElement>("#newTopic")!;
-      const t = input.value.trim();
-      if (!t) return;
-      await setTopics(g.code, [...g.topics, t]);
-    });
-    app.querySelectorAll<HTMLButtonElement>(".remove-topic").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const idx = Number(btn.dataset.idx);
-        await setTopics(g.code, g.topics.filter((_, i) => i !== idx));
+    app.querySelectorAll<HTMLInputElement>(".category-choice").forEach((checkbox) => {
+      checkbox.addEventListener("change", async () => {
+        const key = checkbox.value;
+        const next = checkbox.checked ? [...g.topics, key] : g.topics.filter((t) => t !== key);
+        await setTopics(g.code, next);
       });
     });
     app.querySelector("#startGame")!.addEventListener("click", async () => {
@@ -333,15 +336,24 @@ function renderPlaying(): void {
     main = "<p>טוען סיבוב…</p>";
   } else if (r.status === "asking") {
     if (amAsker) {
-      const topicOptions = g.topics.length
-        ? g.topics.map((t) => `<button class="pick-topic" data-topic="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")
-        : "";
+      const categoryOptions = g.topics
+        .map((key) => `<button class="pick-category" data-category="${key}">${escapeHtml(getCategory(key)?.label ?? key)}</button>`)
+        .join("");
+      const picked = localQuestion ? getQuestion(localQuestion.categoryKey, localQuestion.questionId) : undefined;
       main = `
         <h1>התור שלך לשאול!</h1>
-        <p class="hint">בחרו נושא (לא חובה), ואז שאלו את השאלה בקול.</p>
-        <div class="topic-picker">${topicOptions}</div>
-        ${localTopicChoice ? `<p>נושא: <b>${escapeHtml(localTopicChoice)}</b></p>` : ""}
-        <button id="openBuzzing" class="primary big">שאלתי — פתחו את הבאזרים!</button>
+        <p class="hint">בחרו קטגוריה, קראו את השאלה בקול, ואז פתחו את הבאזרים.</p>
+        <div class="topic-picker">${categoryOptions}</div>
+        ${
+          picked
+            ? `<div class="question-reveal">
+                <p class="hint">${escapeHtml(getCategory(localQuestion!.categoryKey)?.label ?? "")}</p>
+                <p class="question-text">${escapeHtml(picked.q)}</p>
+                <p class="answer-text">תשובה: ${escapeHtml(picked.a)}</p>
+              </div>
+              <button id="openBuzzing" class="primary big">שאלתי — פתחו את הבאזרים!</button>`
+            : ""
+        }
       `;
     } else {
       main = `
@@ -350,17 +362,21 @@ function renderPlaying(): void {
       `;
     }
   } else if (r.status === "buzzing") {
+    const question = r.categoryKey && r.questionId ? getQuestion(r.categoryKey, r.questionId) : undefined;
+    const categoryLabel = r.categoryKey ? getCategory(r.categoryKey)?.label : undefined;
     if (amAsker) {
       main = `
         <h1>מי לחץ ראשון?</h1>
-        ${r.topic ? `<p class="hint">נושא: ${escapeHtml(r.topic)}</p>` : ""}
+        ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
+        ${question ? `<p class="question-text">${escapeHtml(question.q)}</p><p class="answer-text">תשובה: ${escapeHtml(question.a)}</p>` : ""}
         ${renderBuzzList(buzzes, topBuzz)}
         <button id="noWinner" class="secondary">אף אחד לא ידע — לתור הבא</button>
       `;
     } else {
       main = `
         <h1>${tagOf(r.askerUid)} שאל/ה שאלה</h1>
-        ${r.topic ? `<p class="hint">נושא: ${escapeHtml(r.topic)}</p>` : ""}
+        ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
+        ${question ? `<p class="question-text">${escapeHtml(question.q)}</p>` : ""}
         <button id="buzz" class="buzz-btn" ${iAlreadyBuzzed ? "disabled" : ""}>
           ${iAlreadyBuzzed ? "לחצת!" : "לחץ!"}
         </button>
@@ -381,15 +397,19 @@ function renderPlaying(): void {
     </div>
   `;
 
-  app.querySelectorAll<HTMLButtonElement>(".pick-topic").forEach((btn) => {
+  app.querySelectorAll<HTMLButtonElement>(".pick-category").forEach((btn) => {
     btn.addEventListener("click", () => {
-      localTopicChoice = btn.dataset.topic ?? null;
+      const categoryKey = btn.dataset.category!;
+      const question = pickRandomQuestion(categoryKey, g.usedQuestions);
+      if (!question) return;
+      localQuestion = { categoryKey, questionId: question.id };
       render();
     });
   });
 
   app.querySelector("#openBuzzing")?.addEventListener("click", async () => {
-    await openBuzzing(g.code, g.turnIndex, localTopicChoice);
+    if (!localQuestion) return;
+    await openBuzzing(g.code, g.turnIndex, localQuestion.categoryKey, localQuestion.questionId);
   });
 
   app.querySelector("#buzz")?.addEventListener("click", async () => {

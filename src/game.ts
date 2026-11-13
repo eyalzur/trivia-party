@@ -1,4 +1,5 @@
 import {
+  arrayUnion,
   collection,
   doc,
   getDoc,
@@ -14,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { Buzz, BuzzDoc, GameDoc, Player, PlayerDoc, RoundDoc } from "./types";
+import { usedKey } from "./questions";
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -58,6 +60,7 @@ export async function createGame(hostUid: string, name: string, avatar: string):
     topics: [],
     order: [],
     turnIndex: 0,
+    usedQuestions: [],
     createdAt: serverTimestamp(),
   };
   await setDoc(gameRef(code), game);
@@ -118,19 +121,27 @@ export async function setTopics(code: string, topics: string[]): Promise<void> {
 export async function startGame(code: string, order: string[]): Promise<void> {
   await setDoc(roundRef(code, 0), {
     askerUid: order[0],
-    topic: null,
+    categoryKey: null,
+    questionId: null,
     status: "asking",
     openedAt: null,
   } satisfies RoundDoc);
   await updateDoc(gameRef(code), { status: "playing", order, turnIndex: 0 });
 }
 
-export async function openBuzzing(code: string, turnIndex: number, topic: string | null): Promise<void> {
+export async function openBuzzing(
+  code: string,
+  turnIndex: number,
+  categoryKey: string,
+  questionId: string,
+): Promise<void> {
   await updateDoc(roundRef(code, turnIndex), {
-    topic,
+    categoryKey,
+    questionId,
     status: "buzzing",
     openedAt: serverTimestamp(),
   });
+  await updateDoc(gameRef(code), { usedQuestions: arrayUnion(usedKey(categoryKey, questionId)) });
 }
 
 export async function submitBuzz(
@@ -151,7 +162,8 @@ async function advanceTurn(code: string, game: GameDoc): Promise<void> {
   }
   await setDoc(roundRef(code, nextIndex), {
     askerUid: game.order[nextIndex],
-    topic: null,
+    categoryKey: null,
+    questionId: null,
     status: "asking",
     openedAt: null,
   } satisfies RoundDoc);
