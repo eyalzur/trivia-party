@@ -43,10 +43,12 @@ let round: RoundDoc | null = null;
 let buzzes: Buzz[] = [];
 let localQuestion: { categoryKey: string; questionId: string } | null = null;
 let joinError = "";
+let celebratedUids = new Set<string>();
 
-type HomeStep = "name" | "avatar" | "choice" | "join";
+type HomeStep = "name" | "avatar" | "choice" | "gameName" | "join";
 let homeStep: HomeStep = "name";
 let homeInitialized = false;
+let joinAutoOpenCamera = false;
 
 let unsubGame: (() => void) | null = null;
 let unsubPlayers: (() => void) | null = null;
@@ -69,6 +71,7 @@ function teardownRound(): void {
   unsubRound = null;
   unsubBuzzes = null;
   buzzes = [];
+  celebratedUids = new Set();
 }
 
 function watchGame(c: string): void {
@@ -90,6 +93,12 @@ function watchGame(c: string): void {
       });
       unsubBuzzes = subscribeBuzzes(c, g.turnIndex, (b) => {
         buzzes = b;
+        for (const bz of b) {
+          if (bz.judgement === "correct" && !celebratedUids.has(bz.uid)) {
+            celebratedUids.add(bz.uid);
+            fireConfetti();
+          }
+        }
         render();
       });
     }
@@ -136,6 +145,79 @@ function escapeHtml(s: string): string {
   const div = document.createElement("div");
   div.textContent = s;
   return div.innerHTML;
+}
+
+function fireConfetti(): void {
+  const layer = document.createElement("div");
+  layer.className = "confetti-layer";
+  const colors = ["#ff5c8a", "#ff8a5c", "#4cd6b4", "#45b3e0", "#ffd24c"];
+  for (let i = 0; i < 70; i++) {
+    const piece = document.createElement("span");
+    piece.className = "confetti-piece";
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.animationDelay = `${Math.random() * 0.3}s`;
+    piece.style.animationDuration = `${1.1 + Math.random() * 0.9}s`;
+    piece.style.setProperty("--rot", `${Math.random() * 360}deg`);
+    layer.appendChild(piece);
+  }
+  document.body.appendChild(layer);
+  setTimeout(() => layer.remove(), 2300);
+}
+
+function captureRects(selector: string): Map<string, DOMRect> {
+  const map = new Map<string, DOMRect>();
+  app.querySelectorAll<HTMLElement>(selector).forEach((el) => {
+    const uid = el.dataset.uid;
+    if (uid) map.set(uid, el.getBoundingClientRect());
+  });
+  return map;
+}
+
+function playFlip(selector: string, oldRects: Map<string, DOMRect>): void {
+  app.querySelectorAll<HTMLElement>(selector).forEach((el) => {
+    const uid = el.dataset.uid;
+    const old = uid ? oldRects.get(uid) : undefined;
+    if (!old) return;
+    const now = el.getBoundingClientRect();
+    const dy = old.top - now.top;
+    if (Math.abs(dy) < 1) return;
+    el.style.transition = "none";
+    el.style.transform = `translateY(${dy}px)`;
+    requestAnimationFrame(() => {
+      el.style.transition = "transform 0.4s cubic-bezier(.2,.8,.2,1)";
+      el.style.transform = "";
+    });
+  });
+}
+
+function medal(rank: number): string {
+  if (rank === 1) return "🥇";
+  if (rank === 2) return "🥈";
+  if (rank === 3) return "🥉";
+  return `${rank}.`;
+}
+
+function renderScoreboardRows(list: Player[], highlightUid: string): string {
+  const sorted = list.slice().sort((a, b) => b.score - a.score);
+  return `
+    <ul class="scoreboard">
+      ${sorted
+        .map((p, i) => {
+          const rank = i + 1;
+          return `
+            <li class="score-row${p.uid === highlightUid ? " me" : ""} rank-${rank <= 3 ? rank : "other"}" data-uid="${p.uid}">
+              <span class="rank">${medal(rank)}</span>
+              <span class="avatar-circle">${p.avatar}</span>
+              <span class="score-info">
+                <span class="score-name">${escapeHtml(p.name)}</span>
+                <span class="score-pts">${p.score}</span>
+              </span>
+            </li>`;
+        })
+        .join("")}
+    </ul>
+  `;
 }
 
 function render(): void {
@@ -258,6 +340,7 @@ function renderHome(): void {
   if (homeStep === "name") return renderStepName();
   if (homeStep === "avatar") return renderStepAvatar(urlCode);
   if (homeStep === "choice") return renderStepChoice();
+  if (homeStep === "gameName") return renderStepGameName();
   return renderStepJoin(urlCode);
 }
 
@@ -340,20 +423,20 @@ function renderStepChoice(): void {
         <div class="avatar-big">${myAvatar}</div>
         <h1>היי ${escapeHtml(myName)}!</h1>
         <div class="choice-grid">
-          <button id="create" class="choice-card create"><span class="icon">🎉</span><span>צור משחק חדש</span></button>
-          <button id="toJoin" class="choice-card join"><span class="icon">🔑</span><span>הצטרף למשחק</span></button>
+          <button id="create" class="choice-card create"><span class="icon">🎉</span><span>משחק חדש</span></button>
+          <button id="toJoin" class="choice-card join"><span class="icon">📷</span><span>הצטרף למשחק</span></button>
+          <button id="editProfile" class="choice-card profile"><span class="icon">🧑</span><span>פרופיל</span></button>
         </div>
-        <button id="editProfile" class="secondary">✏️ שם / אווטאר</button>
       </div>
     </div>
   `;
 
-  app.querySelector("#create")!.addEventListener("click", async () => {
-    const c = await createGame(myUid, myName.trim(), myAvatar);
-    history.replaceState(null, "", location.pathname);
-    setCode(c);
+  app.querySelector("#create")!.addEventListener("click", () => {
+    homeStep = "gameName";
+    render();
   });
   app.querySelector("#toJoin")!.addEventListener("click", () => {
+    joinAutoOpenCamera = true;
     homeStep = "join";
     render();
   });
@@ -363,11 +446,39 @@ function renderStepChoice(): void {
   });
 }
 
+function renderStepGameName(): void {
+  app.innerHTML = `
+    <div class="screen home">
+      <div class="wizard">
+        <h1>🎉 משחק חדש</h1>
+        <label>שם למשחק (לא חובה)</label>
+        <input id="gameName" maxlength="40" placeholder="לדוגמה: ערב משחקים אצל דנה" />
+        <label>קטגוריות בוחרים בלובי, אחרי היצירה.</label>
+        <button id="createNow">צור משחק</button>
+        <button id="back" class="secondary">חזרה</button>
+      </div>
+    </div>
+  `;
+
+  app.querySelector("#back")!.addEventListener("click", () => {
+    homeStep = "choice";
+    render();
+  });
+  app.querySelector("#createNow")!.addEventListener("click", async () => {
+    const input = app.querySelector<HTMLInputElement>("#gameName")!;
+    const gameName = input.value.trim() || `המשחק של ${myName.trim()}`;
+    const c = await createGame(myUid, myName.trim(), myAvatar, gameName);
+    history.replaceState(null, "", location.pathname);
+    setCode(c);
+  });
+}
+
 function renderStepJoin(urlCode: string): void {
   app.innerHTML = `
     <div class="screen home">
       <div class="wizard">
         <h1>הצטרפות למשחק</h1>
+        <p class="hint">סרקו QR או הזינו קוד ידנית.</p>
         <input id="joinCode" maxlength="5" value="${escapeHtml(urlCode)}" placeholder="קוד" class="code-input" />
         <button id="join">הצטרף</button>
         <button id="scan" class="scan-btn">📷 סרקו קוד QR</button>
@@ -389,7 +500,7 @@ function renderStepJoin(urlCode: string): void {
     const ok = await attemptJoin(c);
     if (!ok) render();
   });
-  app.querySelector("#scan")!.addEventListener("click", () => {
+  const startScan = (): void => {
     openQrScanner((text) => {
       const c = extractCode(text);
       if (!c) return;
@@ -397,7 +508,13 @@ function renderStepJoin(urlCode: string): void {
         if (!ok) render();
       });
     });
-  });
+  };
+  app.querySelector("#scan")!.addEventListener("click", startScan);
+
+  if (joinAutoOpenCamera) {
+    joinAutoOpenCamera = false;
+    startScan();
+  }
 }
 
 function renderLobby(): void {
@@ -405,7 +522,8 @@ function renderLobby(): void {
   const isHost = g.hostUid === myUid;
   app.innerHTML = `
     <div class="screen lobby">
-      <h1>לובי</h1>
+      <h1>${escapeHtml(g.name) || "לובי"}</h1>
+      <p class="hint">קוד הצטרפות</p>
       <div class="join-code">${g.code}</div>
       <div class="qr-wrap"><canvas id="qr"></canvas></div>
       <button id="shareQr" class="secondary">📤 שתפו ב-WhatsApp</button>
@@ -511,16 +629,8 @@ function renderPlaying(): void {
   const amAsker = r?.askerUid === myUid;
   const iAlreadyBuzzed = buzzes.some((b) => b.uid === myUid);
   const topBuzz = buzzes.find((b) => b.judgement === "pending");
-
-  const scoreboard = `
-    <ul class="scoreboard">
-      ${players
-        .slice()
-        .sort((a, b) => b.score - a.score)
-        .map((p) => `<li${p.uid === myUid ? ' class="me"' : ""}>${p.avatar} ${escapeHtml(p.name)} — ${p.score}</li>`)
-        .join("")}
-    </ul>
-  `;
+  const scoreboard = renderScoreboardRows(players, myUid);
+  const oldRects = captureRects(".scoreboard .score-row");
 
   let main = "";
   if (!r) {
@@ -579,7 +689,7 @@ function renderPlaying(): void {
   app.innerHTML = `
     <div class="screen playing">
       <div class="topbar">
-        <span>קוד ${g.code}</span>
+        <span>${escapeHtml(g.name) || `קוד ${g.code}`}</span>
         <span>אתה: ${myScore}</span>
       </div>
       <div class="main">${main}</div>
@@ -587,6 +697,7 @@ function renderPlaying(): void {
       ${scoreboard}
     </div>
   `;
+  playFlip(".scoreboard .score-row", oldRects);
 
   app.querySelectorAll<HTMLButtonElement>(".pick-category").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -644,13 +755,10 @@ function renderBuzzList(list: Buzz[], top: Buzz | undefined): string {
 }
 
 function renderEnded(): void {
-  const sorted = players.slice().sort((a, b) => b.score - a.score);
   app.innerHTML = `
     <div class="screen ended">
       <h1>🏆 המשחק נגמר!</h1>
-      <ol class="final-scoreboard">
-        ${sorted.map((p) => `<li>${p.avatar} ${escapeHtml(p.name)} — ${p.score}</li>`).join("")}
-      </ol>
+      ${renderScoreboardRows(players, myUid)}
       <button id="again">משחק חדש</button>
     </div>
   `;

@@ -4,6 +4,7 @@ export type BuzzJudgement = "pending" | "correct" | "wrong";
 
 export interface GameDoc {
   code: string;
+  name: string;
   hostUid: string;
   status: GameStatus;
   topics: string[];
