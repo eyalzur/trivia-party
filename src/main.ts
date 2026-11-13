@@ -224,6 +224,63 @@ function fireConfetti(): void {
   setTimeout(() => layer.remove(), 2300);
 }
 
+type TextAnim = "drop" | "write" | "explode";
+
+let lastHeadingAnimKey = "";
+
+function animateHeading(el: HTMLElement, variant: TextAnim): void {
+  const text = el.textContent ?? "";
+  el.textContent = "";
+  el.classList.add("anim-host");
+  const frag = document.createDocumentFragment();
+  [...text].forEach((ch, i) => {
+    const span = document.createElement("span");
+    span.textContent = ch === " " ? " " : ch;
+    span.className = `anim-char v-${variant}`;
+    span.style.animationDelay = `${i * 0.04}s`;
+    if (variant === "explode") {
+      const dx = (Math.random() - 0.5) * 160;
+      const dy = (Math.random() - 0.5) * 160 - 30;
+      const rot = (Math.random() - 0.5) * 180;
+      span.style.setProperty("--dx", `${dx}px`);
+      span.style.setProperty("--dy", `${dy}px`);
+      span.style.setProperty("--rot", `${rot}deg`);
+    }
+    frag.appendChild(span);
+  });
+  el.appendChild(frag);
+}
+
+function maybeAnimateHeading(key: string, selector: string, variant: TextAnim): void {
+  if (key === lastHeadingAnimKey) return;
+  lastHeadingAnimKey = key;
+  const el = app.querySelector<HTMLElement>(selector);
+  if (el) animateHeading(el, variant);
+}
+
+function spawnTapBurst(x: number, y: number): void {
+  const colors = ["#ff5c8a", "#ff8a5c", "#2fd6c4", "#45b3e0", "#ffd24c"];
+  for (let i = 0; i < 8; i++) {
+    const particle = document.createElement("span");
+    particle.className = "tap-burst-particle";
+    const angle = (i / 8) * 360 + Math.random() * 20;
+    const dist = 26 + Math.random() * 18;
+    particle.style.left = `${x}px`;
+    particle.style.top = `${y}px`;
+    particle.style.background = colors[i % colors.length];
+    particle.style.setProperty("--dx", `${Math.cos((angle * Math.PI) / 180) * dist}px`);
+    particle.style.setProperty("--dy", `${Math.sin((angle * Math.PI) / 180) * dist}px`);
+    document.body.appendChild(particle);
+    setTimeout(() => particle.remove(), 450);
+  }
+}
+
+document.addEventListener("click", (e) => {
+  const target = (e.target as HTMLElement).closest("button");
+  if (!target || target.hasAttribute("disabled")) return;
+  spawnTapBurst(e.clientX, e.clientY);
+});
+
 function captureRects(selector: string): Map<string, DOMRect> {
   const map = new Map<string, DOMRect>();
   app.querySelectorAll<HTMLElement>(selector).forEach((el) => {
@@ -429,6 +486,7 @@ function renderStepProfile(): void {
       </div>
     </div>
   `;
+  maybeAnimateHeading("home", "h1", "explode");
 
   app.querySelector("#editProfile")!.addEventListener("click", () => {
     editingProfile = true;
@@ -662,6 +720,7 @@ function renderLobby(): void {
       <button id="leave" class="secondary small">עזוב</button>
     </div>
   `;
+  maybeAnimateHeading(`lobby:${g.code}`, ".lobby-header h1", "drop");
 
   const joinUrl = `${location.origin}${location.pathname}?code=${g.code}`;
 
@@ -779,9 +838,11 @@ function renderPlaying(): void {
   const oldRects = captureRects(".scoreboard .score-row");
 
   let main = "";
+  let headingAnim: { key: string; variant: TextAnim } | null = null;
   if (!r) {
     main = "<p>טוען סיבוב…</p>";
   } else if (r.status === "asking") {
+    headingAnim = { key: `asking:${g.turnIndex}:${amAsker}`, variant: "write" };
     if (amAsker) {
       const categoryOptions = g.topics
         .map((key) => `<button class="pick-category" data-category="${key}">${escapeHtml(getCategory(key)?.label ?? key)}</button>`)
@@ -842,6 +903,7 @@ function renderPlaying(): void {
       `;
     }
   } else if (r.status === "done") {
+    headingAnim = { key: `done:${g.turnIndex}`, variant: "explode" };
     const category = r.categoryKey ? getCategory(r.categoryKey) : undefined;
     const categoryLabel = category?.label;
     const questionText =
@@ -871,6 +933,7 @@ function renderPlaying(): void {
       ${scoreboard}
     </div>
   `;
+  if (headingAnim) maybeAnimateHeading(headingAnim.key, ".main h1", headingAnim.variant);
   playFlip(".scoreboard .score-row", oldRects);
 
   app.querySelectorAll<HTMLButtonElement>(".pick-category").forEach((btn) => {
@@ -1029,6 +1092,7 @@ function renderEnded(): void {
       <button id="again">משחק חדש</button>
     </div>
   `;
+  maybeAnimateHeading(`ended:${game?.code ?? ""}`, ".ended h1", "drop");
   app.querySelector("#again")!.addEventListener("click", leaveGame);
 }
 

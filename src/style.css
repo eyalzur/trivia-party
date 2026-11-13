@@ -321,6 +321,37 @@ button.primary.big {
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.scanner-overlay,
+.share-overlay,
+.changelog-overlay {
+  animation: overlay-fade 0.2s ease;
+}
+
+.share-sheet,
+.changelog-sheet {
+  animation: sheet-pop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes overlay-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sheet-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.85) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 .scanner-overlay {
   position: fixed;
   inset: 0;
@@ -953,5 +984,95 @@ button.secondary.small {
   to {
     transform: translateY(110vh) rotate(calc(var(--rot, 0deg) + 480deg));
     opacity: 0.85;
+  }
+}
+
+.anim-host {
+  display: block;
+}
+
+.anim-char {
+  display: inline-block;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.anim-char.v-drop {
+  animation: char-drop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes char-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-46px) rotate(-10deg);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(6px) rotate(3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+}
+
+.anim-char.v-write {
+  animation: char-write 0.32s ease forwards;
+}
+
+@keyframes char-write {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) translateY(5px);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.anim-char.v-explode {
+  animation: char-explode 0.6s cubic-bezier(0.17, 0.89, 0.32, 1.28) forwards;
+}
+
+@keyframes char-explode {
+  0% {
+    opacity: 0;
+    filter: blur(2px);
+    transform: scale(2.1) rotate(var(--rot, 20deg)) translate(var(--dx, 0px), var(--dy, 0px));
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1) rotate(0deg) translate(0, 0);
+  }
+}
+
+.tap-burst-particle {
+  position: fixed;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 90;
+  transform: translate(-50%, -50%);
+  animation: tap-burst 0.45s ease-out forwards;
+}
+
+@keyframes tap-burst {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) scale(0.3);
   }
 }
