@@ -1057,7 +1057,7 @@ function renderChoiceGrid(
             .filter(Boolean)
             .join(" ");
           const scanStyle = isLive
-            ? ` style="animation-delay:${i * 0.05}s, -${(((liveElapsedMs ?? 0) / 1000 + i * 0.6) % 2.4).toFixed(3)}s"`
+            ? ` style="animation-delay:${i * 0.05}s, -${(((liveElapsedMs ?? 0) / 1000 + i * 1.2) % 4.8).toFixed(3)}s"`
             : "";
           return `<button class="${classes}" data-index="${i}" ${disabled ? "disabled" : ""}${scanStyle}>
             <span class="choice-letter">${CHOICE_LETTERS[i]}</span><span>${escapeHtml(text)}</span>
