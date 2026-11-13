@@ -78,19 +78,49 @@ npm run dev
 Open the printed local URL. Open it on your phone too (same wifi,
 use your computer's local IP, or deploy first — see below).
 
-### 4. Deploy
+### 4. Deploy Firestore rules
 
 ```bash
 npm install -g firebase-tools   # once
 firebase login
 firebase use --add              # pick your Firebase project, call it "default"
-npm run deploy
+npm run deploy:rules
 ```
 
-That builds the app and pushes both Hosting and Firestore rules. The
-CLI prints your live URL (`https://<project-id>.web.app`). Share that
-URL (or its QR code) with the room — each phone can install it as an
-app from the browser's "Add to Home Screen" / install prompt.
+### 5. Deploy the app (GitHub Pages)
+
+The app itself is static — it's hosted on GitHub Pages, built by
+`.github/workflows/deploy.yml` on every push to `main`. It needs your
+six Firebase config values as **repo secrets** (Settings → Secrets and
+variables → Actions → New repository secret), same names as in
+`.env.example`:
+
+```
+VITE_FIREBASE_API_KEY
+VITE_FIREBASE_AUTH_DOMAIN
+VITE_FIREBASE_PROJECT_ID
+VITE_FIREBASE_STORAGE_BUCKET
+VITE_FIREBASE_MESSAGING_SENDER_ID
+VITE_FIREBASE_APP_ID
+```
+
+(These aren't actually secret — Firebase web config ships in every
+client bundle by design, security comes from Firestore rules, not from
+hiding this. Repo secrets are just the easiest place to put build-time
+env vars.)
+
+Once the secrets are set, push to `main` (or run the workflow manually
+from the Actions tab) and the site goes live at:
+
+```
+https://eyalzur.github.io/trivia-party/
+```
+
+Share that URL (or its QR code) with the room — each phone can install
+it as an app via the browser's "Add to Home Screen" / install prompt.
+
+If you rename the repo, update `base` in `vite.config.ts` to match the
+new path.
 
 ## Project layout
 
