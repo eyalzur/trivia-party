@@ -1,0 +1,242 @@
+:root {
+  --bg: #16181d;
+  --card: #22252c;
+  --accent: #ff5c5c;
+  --accent2: #4cd6b4;
+  --text: #f2f2f2;
+  --muted: #9a9ea6;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px;
+  padding-bottom: 48px;
+}
+
+h1 {
+  font-size: 1.4rem;
+  margin: 0 0 8px;
+}
+
+h2 {
+  font-size: 1rem;
+  color: var(--muted);
+  margin: 20px 0 8px;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.error {
+  color: var(--accent);
+}
+
+input {
+  width: 100%;
+  padding: 12px;
+  font-size: 1.1rem;
+  border-radius: 10px;
+  border: 1px solid #3a3d44;
+  background: #1c1e24;
+  color: var(--text);
+  margin: 6px 0 12px;
+}
+
+.code-input {
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  text-align: center;
+  font-weight: bold;
+}
+
+button {
+  width: 100%;
+  padding: 14px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-radius: 12px;
+  border: none;
+  background: var(--accent2);
+  color: #0b1d17;
+  margin: 6px 0;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.4;
+}
+
+button.secondary {
+  background: transparent;
+  border: 1px solid #3a3d44;
+  color: var(--text);
+}
+
+button.primary.big {
+  background: var(--accent);
+  color: white;
+  font-size: 1.3rem;
+  padding: 20px;
+}
+
+.card {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 16px;
+  margin: 16px 0;
+}
+
+.join-code {
+  font-size: 2.6rem;
+  font-weight: bold;
+  letter-spacing: 0.15em;
+  text-align: center;
+  background: var(--card);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+ul,
+ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.players li,
+.topics li,
+.scoreboard li,
+.final-scoreboard li {
+  background: var(--card);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.topics li.muted {
+  color: var(--muted);
+}
+
+.remove-topic {
+  width: auto;
+  background: transparent;
+  color: var(--muted);
+  padding: 0 8px;
+}
+
+.add-topic {
+  display: flex;
+  gap: 8px;
+}
+
+.add-topic input {
+  margin: 0;
+}
+
+.add-topic button {
+  width: auto;
+  flex-shrink: 0;
+}
+
+.scoreboard li.me {
+  border: 1px solid var(--accent2);
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-bottom: 12px;
+}
+
+.main {
+  text-align: center;
+  background: var(--card);
+  border-radius: 16px;
+  padding: 24px 16px;
+  margin-bottom: 16px;
+}
+
+.topic-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin: 12px 0;
+}
+
+.topic-picker button {
+  width: auto;
+  background: #2b2e36;
+  color: var(--text);
+  padding: 8px 14px;
+}
+
+.buzz-btn {
+  font-size: 2rem;
+  padding: 40px;
+  border-radius: 50%;
+  aspect-ratio: 1;
+  background: var(--accent);
+  color: white;
+  margin: 16px auto;
+}
+
+.buzz-list {
+  text-align: left;
+  margin-top: 16px;
+}
+
+.buzz-list li {
+  background: #2b2e36;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.buzz-list li.top {
+  border: 1px solid var(--accent2);
+}
+
+.buzz-list button {
+  width: auto;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+}
+
+.judge-correct {
+  background: var(--accent2);
+}
+
+.judge-wrong {
+  background: #4a4d55;
+  color: var(--text);
+}
+
+.final-scoreboard li:first-child {
+  background: #3a3320;
+  border: 1px solid gold;
+}
