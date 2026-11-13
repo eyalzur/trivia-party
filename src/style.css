@@ -1,14 +1,14 @@
 :root {
-  --bg: #15121f;
-  --bg2: #1f1333;
-  --card: #241b38;
-  --card2: #2d2147;
+  --bg: #3a1c71;
+  --bg2: #ff7eb3;
+  --card: #4b2e83;
+  --card2: #6c3fae;
   --accent: #ff5c8a;
   --accent-grad: linear-gradient(135deg, #ff5c8a, #ff8a5c);
-  --accent2: #4cd6b4;
-  --accent2-grad: linear-gradient(135deg, #4cd6b4, #45b3e0);
-  --text: #f5f3fa;
-  --muted: #a69bc2;
+  --accent2: #2fd6c4;
+  --accent2-grad: linear-gradient(135deg, #2fd6c4, #45b3e0);
+  --text: #fff8f2;
+  --muted: #e0cdf5;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: dark;
 }
@@ -24,7 +24,7 @@ body {
 }
 
 body {
-  background: radial-gradient(circle at 50% 0%, var(--bg2), var(--bg) 60%);
+  background: linear-gradient(155deg, #3a1c71 0%, #9c3fae 30%, #ff5c8a 65%, #ffb199 100%);
   background-attachment: fixed;
   color: var(--text);
   min-height: 100vh;
