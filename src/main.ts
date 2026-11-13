@@ -339,7 +339,7 @@ function captureScores(selector: string): Map<string, number> {
   return map;
 }
 
-function animateNumber(el: HTMLElement, from: number, to: number, duration = 700): void {
+function animateNumber(el: HTMLElement, from: number, to: number, duration = 550): void {
   if (from === to) return;
   el.classList.remove("pts-pop");
   void el.offsetWidth;
@@ -720,6 +720,7 @@ function renderLobby(): void {
   app.innerHTML = `
     <div class="screen lobby">
       <div class="lobby-header">
+        <button id="leaveGame" class="home-btn" type="button" aria-label="יציאה">🏠</button>
         <h1>${escapeHtml(g.name) || "לובי"}</h1>
         <button id="openShare" class="share-btn">📤 שתפו</button>
       </div>
@@ -825,6 +826,7 @@ function renderLobby(): void {
 
   app.querySelector("#leave")!.addEventListener("click", leaveGame);
   app.querySelector("#openShare")!.addEventListener("click", () => openShareSheet(g.code, joinUrl));
+  app.querySelector("#leaveGame")!.addEventListener("click", leaveGame);
 }
 
 function openShareSheet(code: string, joinUrl: string): void {
@@ -997,8 +999,9 @@ function renderPlaying(): void {
   app.innerHTML = `
     <div class="screen playing">
       <div class="topbar">
-        <span>${escapeHtml(g.name) || `קוד ${g.code}`}</span>
-        <span>אתה: <span id="myScoreTop">${myScore}</span></span>
+        <button id="leaveGame" class="home-btn" type="button" aria-label="יציאה">🏠</button>
+        <span class="topbar-title">${escapeHtml(g.name) || `קוד ${g.code}`}</span>
+        <span class="topbar-score">אתה: <span id="myScoreTop">${myScore}</span></span>
       </div>
       <div class="main${mainExtraClass}">${main}</div>
       <h2>טבלת ניקוד</h2>
@@ -1069,6 +1072,7 @@ function renderPlaying(): void {
   app.querySelector("#nextQuestion")?.addEventListener("click", async () => {
     await advanceTurn(g.code, g);
   });
+  app.querySelector("#leaveGame")!.addEventListener("click", leaveGame);
 }
 
 const SKY_DAY_TOP = [110, 198, 235];

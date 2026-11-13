@@ -148,6 +148,8 @@ input:focus {
 }
 
 button {
+  position: relative;
+  overflow: hidden;
   width: 100%;
   padding: 15px;
   font-size: 1.1rem;
@@ -158,24 +160,59 @@ button {
   color: #07231c;
   margin: 6px 0;
   cursor: pointer;
-  box-shadow: 0 6px 16px -6px rgba(76, 214, 180, 0.5);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  box-shadow: 0 6px 16px -6px rgba(76, 214, 180, 0.5), inset 0 -4px 0 rgba(0, 0, 0, 0.18);
+  transform: translateY(0);
+  transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.12s ease;
+}
+
+button::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 -60%;
+  width: 40%;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+  animation: btn-shine 3.4s ease-in-out infinite;
+}
+
+@keyframes btn-shine {
+  0% {
+    left: -60%;
+  }
+  35%,
+  100% {
+    left: 130%;
+  }
 }
 
 button:not(:disabled):hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
   filter: brightness(1.05);
 }
 
 button:not(:disabled):active {
-  transform: scale(0.96);
-  box-shadow: none;
-  filter: brightness(0.95);
+  transform: translateY(3px);
+  box-shadow: 0 2px 6px -4px rgba(76, 214, 180, 0.4), inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+  filter: brightness(0.93);
 }
 
 button:disabled {
   opacity: 0.4;
   box-shadow: none;
+}
+
+button:disabled::after,
+.choice-btn::after,
+.category-chip::after,
+.speed-choice::after,
+.topic-picker button::after,
+.pick-category::after,
+.home-btn::after,
+.share-btn::after,
+.scan-btn::after,
+.avatar-choice::after {
+  content: none;
 }
 
 input[type="range"] {
@@ -234,6 +271,10 @@ button.secondary {
   box-shadow: none;
 }
 
+button.secondary::after {
+  content: none;
+}
+
 button.primary.big {
   background: var(--accent-grad);
   color: white;
@@ -243,11 +284,14 @@ button.primary.big {
 }
 
 .card {
-  background: linear-gradient(160deg, var(--card2), var(--card));
+  background: linear-gradient(160deg, rgba(108, 63, 174, 0.4), rgba(75, 46, 131, 0.45));
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
   border-radius: 18px;
   padding: 18px;
   margin: 16px 0;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 10px 34px -14px rgba(0, 0, 0, 0.45);
 }
 
 .wizard {
@@ -479,8 +523,15 @@ ol {
 .lobby-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
+}
+
+.lobby-header h1 {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .share-btn {
@@ -488,6 +539,28 @@ ol {
   flex-shrink: 0;
   padding: 8px 14px;
   font-size: 0.9rem;
+}
+
+.home-btn {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  padding: 0;
+  margin: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: var(--text);
+  font-size: 1rem;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-btn:not(:disabled):active {
+  transform: translateY(2px) scale(0.94);
+  box-shadow: none;
 }
 
 .code-chip {
@@ -763,21 +836,22 @@ button.secondary.small {
 
 .topbar {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
   gap: 8px;
   color: var(--muted);
   font-size: 0.9rem;
   margin-bottom: 12px;
 }
 
-.topbar span:first-child {
+.topbar-title {
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
 }
 
-.topbar span:last-child {
+.topbar-score {
   flex-shrink: 0;
 }
 
@@ -785,10 +859,20 @@ button.secondary.small {
   position: relative;
   overflow: hidden;
   text-align: center;
-  background: var(--card);
+  background: linear-gradient(160deg, rgba(108, 63, 174, 0.35), rgba(75, 46, 131, 0.4));
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 10px 34px -14px rgba(0, 0, 0, 0.45);
   border-radius: 16px;
   padding: 24px 16px;
   margin-bottom: 16px;
+}
+
+.main h1,
+.main .hint,
+.main .question-text {
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
 }
 
 .main > * {
@@ -959,7 +1043,15 @@ button.secondary.small {
   font-weight: 700;
   border-radius: 14px;
   color: white;
-  box-shadow: none;
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.22);
+  transform: translateY(0);
+  transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.12s ease;
+}
+
+.choice-btn:not(:disabled):active {
+  transform: translateY(3px);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.22);
+  filter: brightness(0.92);
 }
 
 .choice-btn.enter {
@@ -973,16 +1065,19 @@ button.secondary.small {
 @keyframes scan-glow {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0), 0 0 0 0 rgba(255, 255, 255, 0);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0), 0 0 0 0 rgba(255, 255, 255, 0),
+      inset 0 -4px 0 rgba(0, 0, 0, 0.22);
     transform: scale(1);
   }
   2.86%,
   18.57% {
-    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.8), 0 0 18px 5px rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.8), 0 0 18px 5px rgba(255, 255, 255, 0.4),
+      inset 0 -4px 0 rgba(0, 0, 0, 0.22);
     transform: scale(1.02);
   }
   21.43% {
-    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0), 0 0 0 0 rgba(255, 255, 255, 0);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0), 0 0 0 0 rgba(255, 255, 255, 0),
+      inset 0 -4px 0 rgba(0, 0, 0, 0.22);
     transform: scale(1);
   }
 }
@@ -1027,12 +1122,25 @@ button.secondary.small {
 }
 
 .choice-btn.picked {
-  outline: 3px solid white;
+  outline: none;
+  animation: picked-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes picked-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.95), 0 0 14px 2px rgba(255, 255, 255, 0.4),
+      inset 0 -4px 0 rgba(0, 0, 0, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 1), 0 0 22px 7px rgba(255, 255, 255, 0.65),
+      inset 0 -4px 0 rgba(0, 0, 0, 0.22);
+  }
 }
 
 .choice-btn.reveal-correct {
-  outline: 3px solid #fff;
-  box-shadow: 0 0 0 3px var(--accent2);
+  outline: none;
+  box-shadow: 0 0 0 3px #fff, 0 0 24px 6px var(--accent2), inset 0 -4px 0 rgba(0, 0, 0, 0.22);
   animation: correct-bounce 0.5s ease;
 }
 
