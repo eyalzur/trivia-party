@@ -357,33 +357,141 @@ ol {
   margin: 0;
 }
 
-.players li,
-.topics li,
-.categories li {
-  background: var(--card);
-  border-radius: 10px;
-  padding: 10px 14px;
-  margin-bottom: 6px;
+.lobby {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
 }
 
-.topics li.muted,
-.categories li.muted {
-  color: var(--muted);
+.lobby h1 {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
-.categories label {
+.lobby h2 {
+  margin: 10px 0 6px;
+  font-size: 0.8rem;
+}
+
+.lobby button {
+  margin: 4px 0;
+}
+
+.lobby-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  width: 100%;
-  cursor: pointer;
+  justify-content: space-between;
+  gap: 10px;
 }
 
-.categories input[type="checkbox"] {
+.share-btn {
   width: auto;
+  flex-shrink: 0;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+}
+
+.code-chip {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 4px 0 10px;
+}
+
+.code-chip b {
+  color: var(--text);
+  letter-spacing: 0.1em;
+}
+
+.player-chips,
+.category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.player-chip {
+  background: var(--card);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.category-chip {
+  width: auto;
+  background: var(--card2);
+  color: var(--text);
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  box-shadow: none;
   margin: 0;
+}
+
+.category-chip.selected {
+  border-color: var(--accent2);
+  background: linear-gradient(135deg, rgba(76, 214, 180, 0.35), rgba(69, 179, 224, 0.35));
+}
+
+.category-chips.readonly .category-chip {
+  cursor: default;
+}
+
+.settings-row {
+  display: flex;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.setting-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.speed-picker.compact {
+  gap: 6px;
+  margin: 0;
+}
+
+.speed-picker.compact .speed-choice {
+  padding: 8px 4px;
+  font-size: 0.85rem;
+}
+
+.hint.small {
+  font-size: 0.78rem;
+  margin: 2px 0;
+}
+
+button.secondary.small {
+  padding: 9px;
+  font-size: 0.9rem;
+}
+
+.share-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.share-sheet {
+  width: 100%;
+  max-width: 400px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: linear-gradient(160deg, var(--card2), var(--card));
+  border-radius: 20px;
+  padding: 20px;
+  text-align: center;
 }
 
 .question-text {

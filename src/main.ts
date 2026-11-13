@@ -599,78 +599,77 @@ function renderLobby(): void {
   const isHost = g.hostUid === myUid;
   app.innerHTML = `
     <div class="screen lobby">
-      <h1>${escapeHtml(g.name) || "לובי"}</h1>
-      <p class="hint">קוד הצטרפות</p>
-      <div class="join-code">${g.code}</div>
-      <div class="qr-wrap"><canvas id="qr"></canvas></div>
-      <button id="shareQr" class="secondary">📤 שתפו ב-WhatsApp</button>
-      <p class="hint">שתפו את הקוד או סרקו את ה-QR — שתי הדרכים מצטרפות לאותו משחק.</p>
+      <div class="lobby-header">
+        <h1>${escapeHtml(g.name) || "לובי"}</h1>
+        <button id="openShare" class="share-btn">📤 שתפו</button>
+      </div>
+      <div class="code-chip">קוד: <b>${g.code}</b></div>
 
-      <h2>שחקנים (${players.length})</h2>
-      <ul class="players">
-        ${players.map((p) => `<li>${p.avatar} ${escapeHtml(p.name)}${p.uid === g.hostUid ? " 👑" : ""}</li>`).join("")}
-      </ul>
+      <div class="player-chips">
+        ${players.map((p) => `<span class="player-chip">${p.avatar} ${escapeHtml(p.name)}${p.uid === g.hostUid ? " 👑" : ""}</span>`).join("")}
+      </div>
 
       <h2>קטגוריות</h2>
       ${
         isHost
-          ? `<ul class="categories">
+          ? `<div class="category-chips">
               ${CATEGORIES.map(
-                (c) => `<li>
-                  <label>
-                    <input type="checkbox" class="category-choice" value="${c.key}" ${g.topics.includes(c.key) ? "checked" : ""} />
-                    ${escapeHtml(c.label)} <span class="muted">(${c.questions.length} שאלות)</span>
-                  </label>
-                </li>`,
+                (c) => `<button class="category-chip${g.topics.includes(c.key) ? " selected" : ""}" data-key="${c.key}">${escapeHtml(c.label)}</button>`,
               ).join("")}
-            </ul>`
-          : `<ul class="categories">
-              ${g.topics.length
-                ? g.topics.map((key) => `<li>${escapeHtml(getCategory(key)?.label ?? key)}</li>`).join("")
-                : "<li class='muted'>המארח עדיין לא בחר קטגוריות</li>"}
-            </ul>`
-      }
-      <h2>כמות שאלות</h2>
-      ${
-        isHost
-          ? `<div class="slider-row">
-              <input type="range" id="totalQuestions" min="3" max="20" step="1" value="${g.totalQuestions ?? DEFAULT_TOTAL_QUESTIONS}" />
-              <span class="slider-value" id="totalQuestionsValue">${g.totalQuestions ?? DEFAULT_TOTAL_QUESTIONS}</span>
             </div>`
-          : `<p class="hint">${g.totalQuestions ?? DEFAULT_TOTAL_QUESTIONS} שאלות</p>`
+          : `<div class="category-chips readonly">
+              ${g.topics.length
+                ? g.topics.map((key) => `<span class="category-chip selected">${escapeHtml(getCategory(key)?.label ?? key)}</span>`).join("")
+                : "<span class='hint'>המארח עדיין לא בחר קטגוריות</span>"}
+            </div>`
       }
 
-      <h2>מהירות</h2>
-      ${
-        isHost
-          ? `<div class="speed-picker">
-              ${SPEED_PRESETS.map(
-                (s) => `<button class="speed-choice${(g.questionDurationMs ?? QUESTION_DURATION_MS) === s.ms ? " selected" : ""}" data-ms="${s.ms}">
-                  <span>${s.label}</span><span class="hint">${s.sub}</span>
-                </button>`,
-              ).join("")}
-            </div>`
-          : `<p class="hint">${SPEED_PRESETS.find((s) => s.ms === (g.questionDurationMs ?? QUESTION_DURATION_MS))?.label ?? "⚡ רגיל"}</p>`
-      }
+      <div class="settings-row">
+        <div class="setting-col">
+          <h2>כמות שאלות</h2>
+          ${
+            isHost
+              ? `<div class="slider-row">
+                  <input type="range" id="totalQuestions" min="3" max="20" step="1" value="${g.totalQuestions ?? DEFAULT_TOTAL_QUESTIONS}" />
+                  <span class="slider-value" id="totalQuestionsValue">${g.totalQuestions ?? DEFAULT_TOTAL_QUESTIONS}</span>
+                </div>`
+              : `<p class="hint">${g.totalQuestions ?? DEFAULT_TOTAL_QUESTIONS} שאלות</p>`
+          }
+        </div>
+        <div class="setting-col">
+          <h2>מהירות</h2>
+          ${
+            isHost
+              ? `<div class="speed-picker compact">
+                  ${SPEED_PRESETS.map(
+                    (s) => `<button class="speed-choice${(g.questionDurationMs ?? QUESTION_DURATION_MS) === s.ms ? " selected" : ""}" data-ms="${s.ms}" title="${s.sub}">${s.label}</button>`,
+                  ).join("")}
+                </div>`
+              : `<p class="hint">${SPEED_PRESETS.find((s) => s.ms === (g.questionDurationMs ?? QUESTION_DURATION_MS))?.label ?? "⚡ רגיל"}</p>`
+          }
+        </div>
+      </div>
 
       ${
         isHost
           ? `<button id="startGame" ${g.topics.length < 1 ? "disabled" : ""}>
               ${players.length < 2 ? "🎮 תצוגה מקדימה (לבד)" : "התחל משחק"}
             </button>
-            ${players.length < 2 ? "<p class='hint'>משחק לבד — אתה גם שואל וגם עונה, רק כדי לראות איך זה עובד.</p>" : ""}
-            ${g.topics.length < 1 ? "<p class='hint'>בחרו לפחות קטגוריה אחת</p>" : ""}`
+            ${players.length < 2 ? "<p class='hint small'>משחק לבד — אתה גם שואל וגם עונה.</p>" : ""}
+            ${g.topics.length < 1 ? "<p class='hint small'>בחרו לפחות קטגוריה אחת</p>" : ""}`
           : "<p class='hint'>ממתינים שהמארח יתחיל…</p>"
       }
-      <button id="leave" class="secondary">עזוב</button>
+      <button id="leave" class="secondary small">עזוב</button>
     </div>
   `;
 
+  const joinUrl = `${location.origin}${location.pathname}?code=${g.code}`;
+
   if (isHost) {
-    app.querySelectorAll<HTMLInputElement>(".category-choice").forEach((checkbox) => {
-      checkbox.addEventListener("change", async () => {
-        const key = checkbox.value;
-        const next = checkbox.checked ? [...g.topics, key] : g.topics.filter((t) => t !== key);
+    app.querySelectorAll<HTMLButtonElement>(".category-chip").forEach((chip) => {
+      chip.addEventListener("click", async () => {
+        const key = chip.dataset.key!;
+        const next = g.topics.includes(key) ? g.topics.filter((t) => t !== key) : [...g.topics, key];
         await setTopics(g.code, next);
       });
     });
@@ -704,13 +703,33 @@ function renderLobby(): void {
   }
 
   app.querySelector("#leave")!.addEventListener("click", leaveGame);
+  app.querySelector("#openShare")!.addEventListener("click", () => openShareSheet(g.code, joinUrl));
+}
 
-  const joinUrl = `${location.origin}${location.pathname}?code=${g.code}`;
-  const qrCanvas = app.querySelector<HTMLCanvasElement>("#qr")!;
-  QRCode.toCanvas(qrCanvas, joinUrl, { margin: 1, width: 220 }).catch(() => {});
+function openShareSheet(code: string, joinUrl: string): void {
+  const overlay = document.createElement("div");
+  overlay.className = "share-overlay";
+  overlay.innerHTML = `
+    <div class="share-sheet">
+      <h1>הזמנה למשחק</h1>
+      <div class="join-code">${code}</div>
+      <div class="qr-wrap"><canvas id="qr"></canvas></div>
+      <button id="shareQr">📤 שתפו ב-WhatsApp</button>
+      <p class="hint">שתפו את הקוד או סרקו את ה-QR — שתי הדרכים מצטרפות לאותו משחק.</p>
+      <button id="closeShare" class="secondary">סגירה</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
 
-  app.querySelector("#shareQr")!.addEventListener("click", () => {
-    void shareJoinQr(qrCanvas, joinUrl, g.code);
+  const qrCanvas = overlay.querySelector<HTMLCanvasElement>("#qr")!;
+  QRCode.toCanvas(qrCanvas, joinUrl, { margin: 1, width: 200 }).catch(() => {});
+
+  overlay.querySelector("#shareQr")!.addEventListener("click", () => {
+    void shareJoinQr(qrCanvas, joinUrl, code);
+  });
+  overlay.querySelector("#closeShare")!.addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
   });
 }
 
