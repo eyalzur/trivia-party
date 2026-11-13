@@ -19,6 +19,7 @@ import {
 } from "./game";
 import type { Buzz, GameDoc, Player, RoundDoc } from "./types";
 import { CATEGORIES, getCategory, getQuestion, pickRandomQuestion } from "./questions";
+import { CHANGELOG } from "./changelog";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
@@ -369,6 +370,7 @@ function renderStepProfile(): void {
             <span class="icon">📷</span><span>הצטרף למשחק</span>
           </button>
         </div>
+        <button id="openChangelog" class="secondary">📜 מה חדש?</button>
       </div>
     </div>
   `;
@@ -387,6 +389,37 @@ function renderStepProfile(): void {
     joinAutoOpenCamera = true;
     homeStep = "join";
     render();
+  });
+  app.querySelector("#openChangelog")!.addEventListener("click", openChangelog);
+}
+
+function openChangelog(): void {
+  const overlay = document.createElement("div");
+  overlay.className = "changelog-overlay";
+  overlay.innerHTML = `
+    <div class="changelog-sheet">
+      <div class="changelog-header">
+        <h1>📜 מה חדש</h1>
+        <button id="closeChangelog" class="secondary">סגירה</button>
+      </div>
+      <ul class="changelog-list">
+        ${CHANGELOG.map(
+          (v) => `
+            <li>
+              <span class="changelog-emoji">${v.emoji}</span>
+              <div class="changelog-body">
+                <div class="changelog-title">${escapeHtml(v.title)} <span class="changelog-version">v${v.version}</span></div>
+                <p class="hint">${escapeHtml(v.desc)}</p>
+              </div>
+            </li>`,
+        ).join("")}
+      </ul>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector("#closeChangelog")!.addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
   });
 }
 

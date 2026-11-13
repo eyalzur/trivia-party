@@ -524,6 +524,78 @@ ol {
   color: var(--text);
 }
 
+.changelog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 55;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.changelog-sheet {
+  width: 100%;
+  max-width: 480px;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: linear-gradient(160deg, var(--card2), var(--card));
+  border-radius: 20px 20px 0 0;
+  padding: 18px;
+  box-shadow: 0 -10px 30px -10px rgba(0, 0, 0, 0.6);
+}
+
+.changelog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.changelog-header h1 {
+  margin: 0;
+}
+
+.changelog-header button {
+  width: auto;
+  padding: 8px 16px;
+}
+
+.changelog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.changelog-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: none;
+  padding: 0;
+  margin: 0;
+}
+
+.changelog-emoji {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+
+.changelog-body {
+  min-width: 0;
+}
+
+.changelog-title {
+  font-weight: 700;
+}
+
+.changelog-version {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.85rem;
+}
+
 .confetti-layer {
   position: fixed;
   inset: 0;
