@@ -996,6 +996,7 @@ function renderPlaying(): void {
     `;
   }
 
+  const showScoreboard = r?.status === "done";
   app.innerHTML = `
     <div class="screen playing">
       <div class="topbar">
@@ -1004,8 +1005,7 @@ function renderPlaying(): void {
         <span class="topbar-score">אתה: <span id="myScoreTop">${myScore}</span></span>
       </div>
       <div class="main${mainExtraClass}">${main}</div>
-      <h2>טבלת ניקוד</h2>
-      ${scoreboard}
+      ${showScoreboard ? `<h2>טבלת ניקוד</h2>${scoreboard}` : ""}
     </div>
   `;
   if (headingAnim) maybeAnimateHeading(headingAnim.key, ".main h1", headingAnim.variant);
