@@ -372,7 +372,12 @@ function renderEnded(): void {
 }
 
 async function boot(): Promise<void> {
-  myUid = await waitForUid();
+  try {
+    myUid = await waitForUid();
+  } catch (err) {
+    app.innerHTML = `<div class="screen"><p class="error">Couldn't connect to Firebase. Did you fill in .env? (${escapeHtml(String(err))})</p></div>`;
+    return;
+  }
   if (code) watchGame(code);
   render();
 }
