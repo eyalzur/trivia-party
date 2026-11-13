@@ -96,14 +96,69 @@ button {
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 
-button:active {
-  transform: scale(0.97);
+button:not(:disabled):hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+button:not(:disabled):active {
+  transform: scale(0.96);
   box-shadow: none;
+  filter: brightness(0.95);
 }
 
 button:disabled {
   opacity: 0.4;
   box-shadow: none;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent2);
+  height: 6px;
+  margin: 0;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 16px;
+}
+
+.slider-value {
+  font-weight: 800;
+  min-width: 28px;
+  text-align: center;
+}
+
+.speed-picker {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 16px;
+}
+
+.speed-choice {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: var(--card2);
+  color: var(--text);
+  box-shadow: none;
+  padding: 10px 6px;
+  border: 2px solid transparent;
+}
+
+.speed-choice .hint {
+  font-size: 0.72rem;
+  margin: 0;
+}
+
+.speed-choice.selected {
+  border-color: var(--accent2);
+  background: var(--card);
 }
 
 button.secondary {
@@ -506,7 +561,28 @@ ol {
 .timer-bar-fill {
   height: 100%;
   background: var(--accent2-grad);
-  transition: width 0.25s linear;
+  transition: width 0.25s linear, background 0.3s ease;
+}
+
+.timer-bar-fill.low {
+  background: linear-gradient(90deg, #ff5c5c, #d6263c);
+  animation: timer-pulse 0.6s ease-in-out infinite;
+}
+
+.timer-sec.low {
+  color: #ff5c5c;
+  font-weight: 800;
+  animation: timer-pulse 0.6s ease-in-out infinite;
+}
+
+@keyframes timer-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .sky-wrap {
@@ -563,6 +639,34 @@ ol {
   border-radius: 14px;
   color: white;
   box-shadow: none;
+  animation: choice-pop 0.3s ease backwards;
+}
+
+.choice-btn:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.choice-btn:nth-child(2) {
+  animation-delay: 0.05s;
+}
+
+.choice-btn:nth-child(3) {
+  animation-delay: 0.1s;
+}
+
+.choice-btn:nth-child(4) {
+  animation-delay: 0.15s;
+}
+
+@keyframes choice-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .choice-letter {
@@ -600,10 +704,26 @@ ol {
 .choice-btn.reveal-correct {
   outline: 3px solid #fff;
   box-shadow: 0 0 0 3px var(--accent2);
+  animation: correct-bounce 0.5s ease;
 }
 
 .choice-btn.reveal-wrong {
   opacity: 0.45;
+}
+
+@keyframes correct-bounce {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.08);
+  }
+  60% {
+    transform: scale(0.97);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .choice-btn:disabled {

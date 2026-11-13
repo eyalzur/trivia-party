@@ -14,7 +14,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { Answer, AnswerDoc, GameDoc, Player, PlayerDoc, RoundDoc } from "./types";
-import { QUESTION_DURATION_MS } from "./types";
+import { DEFAULT_TOTAL_QUESTIONS, QUESTION_DURATION_MS } from "./types";
 import { usedKey } from "./questions";
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -46,9 +46,18 @@ function answerRef(code: string, turnIndex: number, uid: string) {
   return doc(db, "games", code, "rounds", String(turnIndex), "answers", uid);
 }
 
-export function calcPoints(elapsedMs: number): number {
-  const clamped = Math.max(0, Math.min(QUESTION_DURATION_MS, elapsedMs));
-  return 500 + Math.round(500 * (1 - clamped / QUESTION_DURATION_MS));
+export function calcPoints(elapsedMs: number, durationMs: number = QUESTION_DURATION_MS): number {
+  const clamped = Math.max(0, Math.min(durationMs, elapsedMs));
+  return 500 + Math.round(500 * (1 - clamped / durationMs));
+}
+
+export function buildOrder(playerUids: string[], totalQuestions: number): string[] {
+  if (!playerUids.length) return [];
+  const order: string[] = [];
+  for (let i = 0; i < totalQuestions; i++) {
+    order.push(playerUids[i % playerUids.length]);
+  }
+  return order;
 }
 
 export async function createGame(
@@ -72,6 +81,8 @@ export async function createGame(
     order: [],
     turnIndex: 0,
     usedQuestions: [],
+    totalQuestions: DEFAULT_TOTAL_QUESTIONS,
+    questionDurationMs: QUESTION_DURATION_MS,
     createdAt: serverTimestamp(),
   };
   await setDoc(gameRef(code), game);
@@ -123,6 +134,14 @@ export async function setTopics(code: string, topics: string[]): Promise<void> {
   await updateDoc(gameRef(code), { topics });
 }
 
+export async function setGameSettings(
+  code: string,
+  totalQuestions: number,
+  questionDurationMs: number,
+): Promise<void> {
+  await updateDoc(gameRef(code), { totalQuestions, questionDurationMs });
+}
+
 export async function startGame(code: string, order: string[]): Promise<void> {
   await setDoc(roundRef(code, 0), {
     askerUid: order[0],
@@ -163,11 +182,12 @@ export async function submitAnswer(
   choiceIndex: number,
   elapsedMs: number,
   correct: boolean,
+  durationMs: number,
 ): Promise<void> {
   const answer: AnswerDoc = { name, choiceIndex, elapsedMs, at: serverTimestamp() };
   await setDoc(answerRef(code, turnIndex, uid), answer);
   if (correct) {
-    await updateDoc(playerRef(code, uid), { score: increment(calcPoints(elapsedMs)) });
+    await updateDoc(playerRef(code, uid), { score: increment(calcPoints(elapsedMs, durationMs)) });
   }
 }
 

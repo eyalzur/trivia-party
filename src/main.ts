@@ -4,11 +4,13 @@ import jsQR from "jsqr";
 import { waitForUid } from "./firebase";
 import {
   advanceTurn,
+  buildOrder,
   calcPoints,
   createGame,
   finishQuestion,
   getGameOnce,
   joinGame,
+  setGameSettings,
   setTopics,
   startGame,
   startQuestion,
@@ -19,7 +21,13 @@ import {
   submitAnswer,
 } from "./game";
 import type { Answer, GameDoc, Player, RoundDoc } from "./types";
-import { QUESTION_DURATION_MS } from "./types";
+import { DEFAULT_TOTAL_QUESTIONS, QUESTION_DURATION_MS } from "./types";
+
+const SPEED_PRESETS = [
+  { ms: 15000, label: "🐢 רגוע", sub: "15 שנ׳" },
+  { ms: 10000, label: "⚡ רגיל", sub: "10 שנ׳" },
+  { ms: 5000, label: "🔥 מהיר", sub: "5 שנ׳" },
+];
 import { CATEGORIES, getCategory, getQuestion, pickRandomQuestion, shuffledChoices } from "./questions";
 import { CHANGELOG } from "./changelog";
 
@@ -52,6 +60,7 @@ let myPendingChoice: number | null = null;
 let questionStartMs: number | null = null;
 let questionTimerId: number | null = null;
 let questionEndTriggered = false;
+let currentQuestionDurationMs = QUESTION_DURATION_MS;
 let joinError = "";
 let celebratedThisRound = false;
 
@@ -86,6 +95,7 @@ function teardownRound(): void {
   myPendingChoice = null;
   questionStartMs = null;
   questionEndTriggered = false;
+  currentQuestionDurationMs = QUESTION_DURATION_MS;
   celebratedThisRound = false;
   stopQuestionTimer();
 }
@@ -97,11 +107,12 @@ function stopQuestionTimer(): void {
   }
 }
 
-function startQuestionTimer(c: string, turnIndex: number): void {
+function startQuestionTimer(c: string, turnIndex: number, durationMs: number): void {
   stopQuestionTimer();
+  currentQuestionDurationMs = durationMs;
   questionTimerId = window.setInterval(() => {
     const elapsed = questionStartMs !== null ? Date.now() - questionStartMs : 0;
-    if (elapsed >= QUESTION_DURATION_MS && !questionEndTriggered) {
+    if (elapsed >= durationMs && !questionEndTriggered) {
       questionEndTriggered = true;
       stopQuestionTimer();
       void finishQuestion(c, turnIndex);
@@ -128,7 +139,7 @@ function watchGame(c: string): void {
         if (r && r.status === "question" && prevStatus !== "question") {
           questionStartMs = Date.now();
           questionEndTriggered = false;
-          startQuestionTimer(c, g.turnIndex);
+          startQuestionTimer(c, g.turnIndex, g.questionDurationMs ?? QUESTION_DURATION_MS);
         }
         if (r && r.status !== "question") {
           stopQuestionTimer();
@@ -619,6 +630,29 @@ function renderLobby(): void {
                 : "<li class='muted'>המארח עדיין לא בחר קטגוריות</li>"}
             </ul>`
       }
+      <h2>כמות שאלות</h2>
+      ${
+        isHost
+          ? `<div class="slider-row">
+              <input type="range" id="totalQuestions" min="3" max="20" step="1" value="${g.totalQuestions ?? DEFAULT_TOTAL_QUESTIONS}" />
+              <span class="slider-value" id="totalQuestionsValue">${g.totalQuestions ?? DEFAULT_TOTAL_QUESTIONS}</span>
+            </div>`
+          : `<p class="hint">${g.totalQuestions ?? DEFAULT_TOTAL_QUESTIONS} שאלות</p>`
+      }
+
+      <h2>מהירות</h2>
+      ${
+        isHost
+          ? `<div class="speed-picker">
+              ${SPEED_PRESETS.map(
+                (s) => `<button class="speed-choice${(g.questionDurationMs ?? QUESTION_DURATION_MS) === s.ms ? " selected" : ""}" data-ms="${s.ms}">
+                  <span>${s.label}</span><span class="hint">${s.sub}</span>
+                </button>`,
+              ).join("")}
+            </div>`
+          : `<p class="hint">${SPEED_PRESETS.find((s) => s.ms === (g.questionDurationMs ?? QUESTION_DURATION_MS))?.label ?? "⚡ רגיל"}</p>`
+      }
+
       ${
         isHost
           ? `<button id="startGame" ${g.topics.length < 1 ? "disabled" : ""}>
@@ -640,8 +674,31 @@ function renderLobby(): void {
         await setTopics(g.code, next);
       });
     });
+
+    const totalQuestionsInput = app.querySelector<HTMLInputElement>("#totalQuestions")!;
+    const totalQuestionsValue = app.querySelector<HTMLSpanElement>("#totalQuestionsValue")!;
+    let currentMs = g.questionDurationMs ?? QUESTION_DURATION_MS;
+    totalQuestionsInput.addEventListener("input", () => {
+      totalQuestionsValue.textContent = totalQuestionsInput.value;
+    });
+    totalQuestionsInput.addEventListener("change", async () => {
+      await setGameSettings(g.code, Number(totalQuestionsInput.value), currentMs);
+    });
+
+    app.querySelectorAll<HTMLButtonElement>(".speed-choice").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        currentMs = Number(btn.dataset.ms);
+        app.querySelectorAll<HTMLButtonElement>(".speed-choice").forEach((b) => b.classList.remove("selected"));
+        btn.classList.add("selected");
+        await setGameSettings(g.code, Number(totalQuestionsInput.value), currentMs);
+      });
+    });
+
     app.querySelector("#startGame")!.addEventListener("click", async () => {
-      const order = players.map((p) => p.uid);
+      const order = buildOrder(
+        players.map((p) => p.uid),
+        g.totalQuestions ?? DEFAULT_TOTAL_QUESTIONS,
+      );
       await startGame(g.code, order);
     });
   }
@@ -736,12 +793,13 @@ function renderPlaying(): void {
     const questionText =
       r.categoryKey && r.questionId ? getQuestion(r.categoryKey, r.questionId)?.q : undefined;
     const elapsed = questionStartMs !== null ? Date.now() - questionStartMs : 0;
-    const remainingMs = Math.max(0, QUESTION_DURATION_MS - elapsed);
+    const remainingMs = Math.max(0, currentQuestionDurationMs - elapsed);
     const remainingSec = Math.ceil(remainingMs / 1000);
-    const pct = Math.max(0, Math.min(100, (remainingMs / QUESTION_DURATION_MS) * 100));
+    const pct = Math.max(0, Math.min(100, (remainingMs / currentQuestionDurationMs) * 100));
+    const low = pct <= 30;
     const timerBar = `
-      <div class="timer-bar"><div class="timer-bar-fill" style="width:${pct}%"></div></div>
-      <p class="hint">${remainingSec} שניות</p>
+      <div class="timer-bar"><div class="timer-bar-fill${low ? " low" : ""}" style="width:${pct}%"></div></div>
+      <p class="hint timer-sec${low ? " low" : ""}">${remainingSec} שניות</p>
     `;
     const sky = renderSky(pct / 100);
     const soloPreview = amAsker && players.length === 1;
@@ -828,7 +886,16 @@ function renderPlaying(): void {
         render();
         const elapsedMs = questionStartMs !== null ? Date.now() - questionStartMs : 0;
         const correct = choiceIndex === r.correctIndex;
-        await submitAnswer(g.code, g.turnIndex, myUid, myName, choiceIndex, elapsedMs, correct);
+        await submitAnswer(
+          g.code,
+          g.turnIndex,
+          myUid,
+          myName,
+          choiceIndex,
+          elapsedMs,
+          correct,
+          currentQuestionDurationMs,
+        );
       });
     });
   }
@@ -921,7 +988,7 @@ function renderAnswerResults(list: Answer[], correctIndex: number | null): strin
       ${sorted
         .map((a) => {
           const correct = correctIndex !== null && a.choiceIndex === correctIndex;
-          const tag = correct ? ` ✔ +${calcPoints(a.elapsedMs)}` : " ✘";
+          const tag = correct ? ` ✔ +${calcPoints(a.elapsedMs, currentQuestionDurationMs)}` : " ✘";
           return `<li>${avatarOf(a.uid)} ${escapeHtml(a.name)}${tag}</li>`;
         })
         .join("")}

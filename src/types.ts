@@ -2,6 +2,7 @@ export type GameStatus = "lobby" | "playing" | "ended";
 export type RoundStatus = "asking" | "question" | "done";
 
 export const QUESTION_DURATION_MS = 10000;
+export const DEFAULT_TOTAL_QUESTIONS = 6;
 
 export interface GameDoc {
   code: string;
@@ -12,6 +13,8 @@ export interface GameDoc {
   order: string[];
   turnIndex: number;
   usedQuestions: string[];
+  totalQuestions: number;
+  questionDurationMs: number;
   createdAt: unknown;
 }
 
