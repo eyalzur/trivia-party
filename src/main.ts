@@ -1059,7 +1059,7 @@ function renderChoiceGrid(
             .filter(Boolean)
             .join(" ");
           const style = isLive
-            ? ` style="animation-delay:-${(((liveElapsedMs ?? 0) / 1000 + i * 1.2) % 4.8).toFixed(3)}s"`
+            ? ` style="animation-delay:-${(((liveElapsedMs ?? 0) / 1000 + i * 1.75) % 7).toFixed(3)}s"`
             : entrance
               ? ` style="animation-delay:${i * 0.05}s"`
               : "";
