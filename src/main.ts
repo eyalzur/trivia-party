@@ -838,6 +838,7 @@ function renderPlaying(): void {
   const oldRects = captureRects(".scoreboard .score-row");
 
   let main = "";
+  let mainExtraClass = "";
   let headingAnim: { key: string; variant: TextAnim } | null = null;
   if (!r) {
     main = "<p>טוען סיבוב…</p>";
@@ -882,24 +883,29 @@ function renderPlaying(): void {
       <p class="hint timer-sec${low ? " low" : ""}">${remainingSec} שניות</p>
     `;
     const sky = renderSky(pct / 100);
+    const breatheDelay = ((Date.now() / 1000) % 3.2).toFixed(3);
+    const breatheStyle = ` style="animation-delay:-${breatheDelay}s"`;
     const soloPreview = amAsker && players.length === 1;
+    mainExtraClass = " sky-active";
     if (amAsker && !soloPreview) {
       main = `
-        <h1>מי יענה נכון?</h1>
+        ${sky}
+        <h1${breatheStyle}>מי יענה נכון?</h1>
         ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
         ${questionText ? `<p class="question-text">${escapeHtml(questionText)}</p>` : ""}
         ${timerBar}
-        <div class="sky-wrap">${sky}${renderChoiceGrid(r.choices ?? [], null, null, true)}</div>
+        ${renderChoiceGrid(r.choices ?? [], null, null, true)}
         <p class="hint">${answers.length} מתוך ${Math.max(players.length - 1, 0)} ענו</p>
       `;
     } else {
       const choiceIndex = myAnswer ? myAnswer.choiceIndex : (myPendingChoice ?? null);
       main = `
-        <h1>${soloPreview ? "תצוגה מקדימה — ענה בעצמך" : `${tagOf(r.askerUid)} שאל/ה שאלה`}</h1>
+        ${sky}
+        <h1${breatheStyle}>${soloPreview ? "תצוגה מקדימה — ענה בעצמך" : `${tagOf(r.askerUid)} שאל/ה שאלה`}</h1>
         ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
         ${questionText ? `<p class="question-text">${escapeHtml(questionText)}</p>` : ""}
         ${timerBar}
-        <div class="sky-wrap">${sky}${renderChoiceGrid(r.choices ?? [], null, choiceIndex, choiceIndex !== null, elapsed)}</div>
+        ${renderChoiceGrid(r.choices ?? [], null, choiceIndex, choiceIndex !== null, elapsed)}
       `;
     }
   } else if (r.status === "done") {
@@ -928,7 +934,7 @@ function renderPlaying(): void {
         <span>${escapeHtml(g.name) || `קוד ${g.code}`}</span>
         <span>אתה: ${myScore}</span>
       </div>
-      <div class="main">${main}</div>
+      <div class="main${mainExtraClass}">${main}</div>
       <h2>טבלת ניקוד</h2>
       ${scoreboard}
     </div>
@@ -1022,7 +1028,7 @@ function renderSky(t: number): string {
   const moonOpacity = Math.max(0, Math.min(1, (0.55 - clamped) / 0.3));
   const bodyTop = 8 + (1 - clamped) * 60;
   return `
-    <div class="sky-body" style="background:linear-gradient(180deg, rgb(${top.join(",")}), rgb(${bottom.join(",")}))">
+    <div class="sky-overlay" style="background:linear-gradient(180deg, rgb(${top.join(",")}), rgb(${bottom.join(",")}))">
       ${SKY_STARS.map(([x, y]) => `<span class="sky-star" style="left:${x}%; top:${y}%; opacity:${moonOpacity}">✨</span>`).join("")}
       <span class="sky-sun" style="top:${bodyTop}%; opacity:${sunOpacity}">☀️</span>
       <span class="sky-moon" style="top:${bodyTop}%; opacity:${moonOpacity}">🌙</span>

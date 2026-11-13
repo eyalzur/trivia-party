@@ -592,9 +592,10 @@ button.secondary.small {
 }
 
 .question-text {
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin: 12px 0 4px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.35;
+  margin: 12px 0 6px;
 }
 
 .answer-text {
@@ -717,11 +718,35 @@ button.secondary.small {
 }
 
 .main {
+  position: relative;
+  overflow: hidden;
   text-align: center;
   background: var(--card);
   border-radius: 16px;
   padding: 24px 16px;
   margin-bottom: 16px;
+}
+
+.main > * {
+  position: relative;
+  z-index: 1;
+}
+
+.main h1 {
+  animation: heading-breathe 3.2s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@keyframes heading-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0));
+  }
+  50% {
+    transform: scale(1.025);
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.35));
+  }
 }
 
 .topic-picker {
@@ -774,6 +799,11 @@ button.secondary.small {
   animation: timer-pulse 0.6s ease-in-out infinite;
 }
 
+.timer-sec {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
 .timer-sec.low {
   color: #ff5c5c;
   font-weight: 800;
@@ -790,15 +820,7 @@ button.secondary.small {
   }
 }
 
-.sky-wrap {
-  position: relative;
-  border-radius: 18px;
-  padding: 14px;
-  margin: 14px 0;
-  overflow: hidden;
-}
-
-.sky-body {
+.sky-overlay {
   position: absolute;
   inset: 0;
   z-index: 0;
@@ -820,10 +842,11 @@ button.secondary.small {
   transition: opacity 0.3s linear;
 }
 
-.sky-wrap .choice-grid-answers {
-  position: relative;
-  z-index: 1;
-  margin: 0;
+.main.sky-active h1,
+.main.sky-active .hint,
+.main.sky-active .question-text,
+.main.sky-active .timer-sec {
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5), 0 0 3px rgba(0, 0, 0, 0.35);
 }
 
 .choice-grid-answers {
