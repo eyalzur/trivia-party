@@ -63,6 +63,7 @@ let questionEndTriggered = false;
 let currentQuestionDurationMs = QUESTION_DURATION_MS;
 let joinError = "";
 let celebratedThisRound = false;
+let prevMyScoreTop: number | null = null;
 
 type HomeStep = "profile" | "gameName" | "join";
 let homeStep: HomeStep = "profile";
@@ -304,6 +305,46 @@ function playFlip(selector: string, oldRects: Map<string, DOMRect>): void {
       el.style.transition = "transform 0.4s cubic-bezier(.2,.8,.2,1)";
       el.style.transform = "";
     });
+  });
+}
+
+function captureScores(selector: string): Map<string, number> {
+  const map = new Map<string, number>();
+  app.querySelectorAll<HTMLElement>(selector).forEach((el) => {
+    const uid = el.dataset.uid;
+    const ptsEl = el.querySelector<HTMLElement>(".score-pts");
+    if (uid && ptsEl) map.set(uid, Number(ptsEl.textContent) || 0);
+  });
+  return map;
+}
+
+function animateNumber(el: HTMLElement, from: number, to: number, duration = 700): void {
+  if (from === to) return;
+  el.classList.remove("pts-pop");
+  void el.offsetWidth;
+  el.classList.add("pts-pop");
+  const start = performance.now();
+  function step(now: number) {
+    const t = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = String(Math.round(from + (to - from) * eased));
+    if (t < 1) {
+      requestAnimationFrame(step);
+    } else {
+      el.textContent = String(to);
+    }
+  }
+  requestAnimationFrame(step);
+}
+
+function playScoreCounts(selector: string, oldScores: Map<string, number>): void {
+  app.querySelectorAll<HTMLElement>(selector).forEach((el) => {
+    const uid = el.dataset.uid;
+    const ptsEl = el.querySelector<HTMLElement>(".score-pts");
+    if (!uid || !ptsEl) return;
+    const newVal = Number(ptsEl.textContent) || 0;
+    const oldVal = oldScores.get(uid);
+    if (oldVal !== undefined && oldVal !== newVal) animateNumber(ptsEl, oldVal, newVal);
   });
 }
 
@@ -836,6 +877,7 @@ function renderPlaying(): void {
   const myAnswer = answers.find((a) => a.uid === myUid);
   const scoreboard = renderScoreboardRows(players, myUid);
   const oldRects = captureRects(".scoreboard .score-row");
+  const oldScores = captureScores(".scoreboard .score-row");
 
   let main = "";
   let mainExtraClass = "";
@@ -914,10 +956,13 @@ function renderPlaying(): void {
     const categoryLabel = category?.label;
     const questionText =
       r.categoryKey && r.questionId ? getQuestion(r.categoryKey, r.questionId)?.q : undefined;
+    const myCorrect = r.correctIndex !== null && myAnswer && myAnswer.choiceIndex === r.correctIndex;
+    const myEarnedPts = myCorrect && myAnswer ? calcPoints(myAnswer.elapsedMs, currentQuestionDurationMs) : 0;
     main = `
       <h1>${amAsker ? "התוצאות!" : `${tagOf(r.askerUid)} שאל/ה`}</h1>
       ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
       ${questionText ? `<p class="question-text">${escapeHtml(questionText)}</p>` : ""}
+      ${myEarnedPts > 0 ? `<div class="points-burst">+${myEarnedPts} 🎉</div>` : ""}
       ${renderChoiceGrid(r.choices ?? [], r.correctIndex, myAnswer ? myAnswer.choiceIndex : null, true, undefined, true)}
       ${renderAnswerResults(answers, r.correctIndex)}
       ${
@@ -932,7 +977,7 @@ function renderPlaying(): void {
     <div class="screen playing">
       <div class="topbar">
         <span>${escapeHtml(g.name) || `קוד ${g.code}`}</span>
-        <span>אתה: ${myScore}</span>
+        <span>אתה: <span id="myScoreTop">${myScore}</span></span>
       </div>
       <div class="main${mainExtraClass}">${main}</div>
       <h2>טבלת ניקוד</h2>
@@ -941,6 +986,12 @@ function renderPlaying(): void {
   `;
   if (headingAnim) maybeAnimateHeading(headingAnim.key, ".main h1", headingAnim.variant);
   playFlip(".scoreboard .score-row", oldRects);
+  playScoreCounts(".scoreboard .score-row", oldScores);
+  const myScoreTopEl = document.getElementById("myScoreTop");
+  if (myScoreTopEl) {
+    if (prevMyScoreTop !== null && prevMyScoreTop !== myScore) animateNumber(myScoreTopEl, prevMyScoreTop, myScore);
+    prevMyScoreTop = myScore;
+  }
 
   app.querySelectorAll<HTMLButtonElement>(".pick-category").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1084,10 +1135,12 @@ function renderAnswerResults(list: Answer[], correctIndex: number | null): strin
   return `
     <ol class="buzz-list">
       ${sorted
-        .map((a) => {
+        .map((a, i) => {
           const correct = correctIndex !== null && a.choiceIndex === correctIndex;
-          const tag = correct ? ` ✔ +${calcPoints(a.elapsedMs, currentQuestionDurationMs)}` : " ✘";
-          return `<li>${avatarOf(a.uid)} ${escapeHtml(a.name)}${tag}</li>`;
+          const tag = correct
+            ? `<span class="buzz-pts correct">✔ +${calcPoints(a.elapsedMs, currentQuestionDurationMs)}</span>`
+            : `<span class="buzz-pts wrong">✘</span>`;
+          return `<li style="animation-delay:${i * 0.08}s">${avatarOf(a.uid)} ${escapeHtml(a.name)}${tag}</li>`;
         })
         .join("")}
     </ol>
