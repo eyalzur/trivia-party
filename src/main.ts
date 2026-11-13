@@ -621,8 +621,10 @@ function renderLobby(): void {
       }
       ${
         isHost
-          ? `<button id="startGame" ${players.length < 2 || g.topics.length < 1 ? "disabled" : ""}>התחל משחק</button>
-            ${players.length < 2 ? "<p class='hint'>צריך לפחות 2 שחקנים</p>" : ""}
+          ? `<button id="startGame" ${g.topics.length < 1 ? "disabled" : ""}>
+              ${players.length < 2 ? "🎮 תצוגה מקדימה (לבד)" : "התחל משחק"}
+            </button>
+            ${players.length < 2 ? "<p class='hint'>משחק לבד — אתה גם שואל וגם עונה, רק כדי לראות איך זה עובד.</p>" : ""}
             ${g.topics.length < 1 ? "<p class='hint'>בחרו לפחות קטגוריה אחת</p>" : ""}`
           : "<p class='hint'>ממתינים שהמארח יתחיל…</p>"
       }
@@ -742,7 +744,8 @@ function renderPlaying(): void {
       <p class="hint">${remainingSec} שניות</p>
     `;
     const sky = renderSky(pct / 100);
-    if (amAsker) {
+    const soloPreview = amAsker && players.length === 1;
+    if (amAsker && !soloPreview) {
       main = `
         <h1>מי יענה נכון?</h1>
         ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
@@ -754,7 +757,7 @@ function renderPlaying(): void {
     } else {
       const choiceIndex = myAnswer ? myAnswer.choiceIndex : (myPendingChoice ?? null);
       main = `
-        <h1>${tagOf(r.askerUid)} שאל/ה שאלה</h1>
+        <h1>${soloPreview ? "תצוגה מקדימה — ענה בעצמך" : `${tagOf(r.askerUid)} שאל/ה שאלה`}</h1>
         ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
         ${questionText ? `<p class="question-text">${escapeHtml(questionText)}</p>` : ""}
         ${timerBar}
@@ -816,7 +819,7 @@ function renderPlaying(): void {
     );
   });
 
-  if (r?.status === "question" && !amAsker) {
+  if (r?.status === "question" && (!amAsker || players.length === 1)) {
     app.querySelectorAll<HTMLButtonElement>(".choice-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
         if (myAnswer || myPendingChoice !== null) return;
