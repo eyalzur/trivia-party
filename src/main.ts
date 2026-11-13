@@ -127,19 +127,19 @@ function renderHome(): void {
   const urlCode = new URLSearchParams(location.search).get("code") ?? "";
   app.innerHTML = `
     <div class="screen home">
-      <h1>🎉 Trivia Party</h1>
-      <label>Your name</label>
-      <input id="name" maxlength="20" value="${escapeHtml(myName)}" placeholder="e.g. Dana" />
+      <h1>🎉 מסיבת טריוויה</h1>
+      <label>השם שלך</label>
+      <input id="name" maxlength="20" value="${escapeHtml(myName)}" placeholder="לדוגמה: דנה" />
 
       <div class="card">
-        <h2>Start a new game</h2>
-        <button id="create">Create game</button>
+        <h2>התחילו משחק חדש</h2>
+        <button id="create">צור משחק</button>
       </div>
 
       <div class="card">
-        <h2>Join a game</h2>
-        <input id="joinCode" maxlength="5" value="${escapeHtml(urlCode)}" placeholder="CODE" class="code-input" />
-        <button id="join">Join</button>
+        <h2>הצטרפו למשחק</h2>
+        <input id="joinCode" maxlength="5" value="${escapeHtml(urlCode)}" placeholder="קוד" class="code-input" />
+        <button id="join">הצטרף</button>
         ${joinError ? `<p class="error">${escapeHtml(joinError)}</p>` : ""}
       </div>
     </div>
@@ -152,20 +152,20 @@ function renderHome(): void {
   });
 
   app.querySelector("#create")!.addEventListener("click", async () => {
-    if (!myName.trim()) return alert("Enter your name first");
+    if (!myName.trim()) return alert("קודם תכניסו שם");
     const c = await createGame(myUid, myName.trim());
     history.replaceState(null, "", location.pathname);
     setCode(c);
   });
 
   app.querySelector("#join")!.addEventListener("click", async () => {
-    if (!myName.trim()) return alert("Enter your name first");
+    if (!myName.trim()) return alert("קודם תכניסו שם");
     const input = app.querySelector<HTMLInputElement>("#joinCode")!;
     const c = input.value.trim().toUpperCase();
     if (!c) return;
     const existing = await getGameOnce(c);
     if (!existing) {
-      joinError = "No game with that code";
+      joinError = "לא נמצא משחק עם הקוד הזה";
       render();
       return;
     }
@@ -181,35 +181,35 @@ function renderLobby(): void {
   const isHost = g.hostUid === myUid;
   app.innerHTML = `
     <div class="screen lobby">
-      <h1>Lobby</h1>
+      <h1>לובי</h1>
       <div class="join-code">${g.code}</div>
-      <p class="hint">Share this code — everyone joins at the same link.</p>
+      <p class="hint">שתפו את הקוד הזה — כולם מצטרפים עם אותו קוד.</p>
 
-      <h2>Players (${players.length})</h2>
+      <h2>שחקנים (${players.length})</h2>
       <ul class="players">
         ${players.map((p) => `<li>${escapeHtml(p.name)}${p.uid === g.hostUid ? " 👑" : ""}</li>`).join("")}
       </ul>
 
-      <h2>Topics</h2>
+      <h2>נושאים</h2>
       <ul class="topics">
         ${g.topics
           .map(
             (t, i) =>
               `<li>${escapeHtml(t)}${isHost ? `<button data-idx="${i}" class="remove-topic">✕</button>` : ""}</li>`,
           )
-          .join("") || "<li class='muted'>No topics yet</li>"}
+          .join("") || "<li class='muted'>עדיין אין נושאים</li>"}
       </ul>
       ${
         isHost
           ? `<div class="add-topic">
-              <input id="newTopic" placeholder="e.g. Movies" maxlength="30" />
-              <button id="addTopic">Add</button>
+              <input id="newTopic" placeholder="לדוגמה: סרטים" maxlength="30" />
+              <button id="addTopic">הוסף</button>
             </div>
-            <button id="startGame" ${players.length < 2 ? "disabled" : ""}>Start game</button>
-            ${players.length < 2 ? "<p class='hint'>Need at least 2 players</p>" : ""}`
-          : "<p class='hint'>Waiting for host to start…</p>"
+            <button id="startGame" ${players.length < 2 ? "disabled" : ""}>התחל משחק</button>
+            ${players.length < 2 ? "<p class='hint'>צריך לפחות 2 שחקנים</p>" : ""}`
+          : "<p class='hint'>ממתינים שהמארח יתחיל…</p>"
       }
-      <button id="leave" class="secondary">Leave</button>
+      <button id="leave" class="secondary">עזוב</button>
     </div>
   `;
 
@@ -255,39 +255,39 @@ function renderPlaying(): void {
 
   let main = "";
   if (!r) {
-    main = "<p>Loading round…</p>";
+    main = "<p>טוען סיבוב…</p>";
   } else if (r.status === "asking") {
     if (amAsker) {
       const topicOptions = g.topics.length
         ? g.topics.map((t) => `<button class="pick-topic" data-topic="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")
         : "";
       main = `
-        <h1>It's your turn to ask!</h1>
-        <p class="hint">Pick a topic (optional), then ask your question out loud.</p>
+        <h1>התור שלך לשאול!</h1>
+        <p class="hint">בחרו נושא (לא חובה), ואז שאלו את השאלה בקול.</p>
         <div class="topic-picker">${topicOptions}</div>
-        ${localTopicChoice ? `<p>Topic: <b>${escapeHtml(localTopicChoice)}</b></p>` : ""}
-        <button id="openBuzzing" class="primary big">I asked it — open buzzers!</button>
+        ${localTopicChoice ? `<p>נושא: <b>${escapeHtml(localTopicChoice)}</b></p>` : ""}
+        <button id="openBuzzing" class="primary big">שאלתי — פתחו את הבאזרים!</button>
       `;
     } else {
       main = `
-        <h1>${escapeHtml(nameOf(r.askerUid))} is asking…</h1>
-        <p class="hint">Get ready to buzz in!</p>
+        <h1>${escapeHtml(nameOf(r.askerUid))} שואל/ת…</h1>
+        <p class="hint">התכוננו ללחוץ!</p>
       `;
     }
   } else if (r.status === "buzzing") {
     if (amAsker) {
       main = `
-        <h1>Who buzzed first?</h1>
-        ${r.topic ? `<p class="hint">Topic: ${escapeHtml(r.topic)}</p>` : ""}
+        <h1>מי לחץ ראשון?</h1>
+        ${r.topic ? `<p class="hint">נושא: ${escapeHtml(r.topic)}</p>` : ""}
         ${renderBuzzList(buzzes, topBuzz)}
-        <button id="noWinner" class="secondary">Nobody got it — next turn</button>
+        <button id="noWinner" class="secondary">אף אחד לא ידע — לתור הבא</button>
       `;
     } else {
       main = `
-        <h1>${escapeHtml(nameOf(r.askerUid))} asked a question</h1>
-        ${r.topic ? `<p class="hint">Topic: ${escapeHtml(r.topic)}</p>` : ""}
+        <h1>${escapeHtml(nameOf(r.askerUid))} שאל/ה שאלה</h1>
+        ${r.topic ? `<p class="hint">נושא: ${escapeHtml(r.topic)}</p>` : ""}
         <button id="buzz" class="buzz-btn" ${iAlreadyBuzzed ? "disabled" : ""}>
-          ${iAlreadyBuzzed ? "Buzzed!" : "BUZZ"}
+          ${iAlreadyBuzzed ? "לחצת!" : "לחץ!"}
         </button>
         ${renderBuzzList(buzzes, topBuzz)}
       `;
@@ -297,11 +297,11 @@ function renderPlaying(): void {
   app.innerHTML = `
     <div class="screen playing">
       <div class="topbar">
-        <span>Code ${g.code}</span>
-        <span>You: ${myScore}</span>
+        <span>קוד ${g.code}</span>
+        <span>אתה: ${myScore}</span>
       </div>
       <div class="main">${main}</div>
-      <h2>Scoreboard</h2>
+      <h2>טבלת ניקוד</h2>
       ${scoreboard}
     </div>
   `;
@@ -338,7 +338,7 @@ function renderPlaying(): void {
 }
 
 function renderBuzzList(list: Buzz[], top: Buzz | undefined): string {
-  if (!list.length) return "<p class='hint'>Waiting for buzzes…</p>";
+  if (!list.length) return "<p class='hint'>ממתינים ללחיצות…</p>";
   return `
     <ol class="buzz-list">
       ${list
@@ -346,8 +346,8 @@ function renderBuzzList(list: Buzz[], top: Buzz | undefined): string {
           const isTop = b.uid === top?.uid;
           const judgeButtons =
             isTop && b.judgement === "pending"
-              ? `<button class="judge-correct" data-uid="${b.uid}">✔ Correct</button>
-                 <button class="judge-wrong" data-uid="${b.uid}">✘ Wrong</button>`
+              ? `<button class="judge-correct" data-uid="${b.uid}">✔ נכון</button>
+                 <button class="judge-wrong" data-uid="${b.uid}">✘ לא נכון</button>`
               : "";
           const tag = b.judgement === "correct" ? " ✔" : b.judgement === "wrong" ? " ✘" : "";
           return `<li class="${isTop ? "top" : ""}">${escapeHtml(b.name)}${tag}${judgeButtons}</li>`;
@@ -361,11 +361,11 @@ function renderEnded(): void {
   const sorted = players.slice().sort((a, b) => b.score - a.score);
   app.innerHTML = `
     <div class="screen ended">
-      <h1>🏆 Game over!</h1>
+      <h1>🏆 המשחק נגמר!</h1>
       <ol class="final-scoreboard">
         ${sorted.map((p) => `<li>${escapeHtml(p.name)} — ${p.score}</li>`).join("")}
       </ol>
-      <button id="again">New game</button>
+      <button id="again">משחק חדש</button>
     </div>
   `;
   app.querySelector("#again")!.addEventListener("click", leaveGame);
@@ -375,7 +375,7 @@ async function boot(): Promise<void> {
   try {
     myUid = await waitForUid();
   } catch (err) {
-    app.innerHTML = `<div class="screen"><p class="error">Couldn't connect to Firebase. Did you fill in .env? (${escapeHtml(String(err))})</p></div>`;
+    app.innerHTML = `<div class="screen"><p class="error">לא הצלחנו להתחבר ל-Firebase. בדקת את קובץ ה-.env? (${escapeHtml(String(err))})</p></div>`;
     return;
   }
   if (code) watchGame(code);
