@@ -28,6 +28,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,png,svg}"],
+        clientsClaim: true,
+        skipWaiting: true,
       },
     }),
   ],

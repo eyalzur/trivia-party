@@ -113,10 +113,10 @@ button:disabled {
 }
 
 input[type="range"] {
-  width: 100%;
+  width: calc(100% + 16px);
+  margin-inline: -8px;
   accent-color: var(--accent2);
   height: 6px;
-  margin: 0;
 }
 
 .slider-row {
