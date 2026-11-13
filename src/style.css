@@ -102,6 +102,40 @@ button.primary.big {
   margin: 16px 0;
 }
 
+.avatar-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.avatar-choice {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  padding: 0;
+  font-size: 1.6rem;
+  background: #2b2e36;
+  border-radius: 10px;
+}
+
+.avatar-choice.selected {
+  outline: 2px solid var(--accent2);
+}
+
+.qr-wrap {
+  text-align: center;
+  margin: 12px 0;
+}
+
+.qr-wrap img {
+  width: 180px;
+  height: 180px;
+  border-radius: 12px;
+  background: white;
+  padding: 8px;
+}
+
 .join-code {
   font-size: 2.6rem;
   font-weight: bold;

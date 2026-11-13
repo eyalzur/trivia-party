@@ -44,7 +44,7 @@ function buzzRef(code: string, turnIndex: number, uid: string) {
   return doc(db, "games", code, "rounds", String(turnIndex), "buzzes", uid);
 }
 
-export async function createGame(hostUid: string, name: string): Promise<string> {
+export async function createGame(hostUid: string, name: string, avatar: string): Promise<string> {
   let code = randomCode();
   for (let attempt = 0; attempt < 5; attempt++) {
     const snap = await getDoc(gameRef(code));
@@ -61,12 +61,12 @@ export async function createGame(hostUid: string, name: string): Promise<string>
     createdAt: serverTimestamp(),
   };
   await setDoc(gameRef(code), game);
-  await joinGame(code, hostUid, name);
+  await joinGame(code, hostUid, name, avatar);
   return code;
 }
 
-export async function joinGame(code: string, uid: string, name: string): Promise<void> {
-  const player: PlayerDoc = { name, score: 0, joinedAt: serverTimestamp() };
+export async function joinGame(code: string, uid: string, name: string, avatar: string): Promise<void> {
+  const player: PlayerDoc = { name, avatar, score: 0, joinedAt: serverTimestamp() };
   await setDoc(playerRef(code, uid), player, { merge: true });
 }
 

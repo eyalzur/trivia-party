@@ -1,4 +1,5 @@
 import "./style.css";
+import QRCode from "qrcode";
 import { waitForUid } from "./firebase";
 import {
   createGame,
@@ -21,9 +22,17 @@ const app = document.querySelector<HTMLDivElement>("#app")!;
 
 const LS_NAME = "trivia.name";
 const LS_CODE = "trivia.code";
+const LS_AVATAR = "trivia.avatar";
+
+const AVATARS = [
+  "🦄", "🐸", "🐧", "🦊", "🐵", "🐶", "🐱", "🦁",
+  "🐯", "🐨", "🐼", "🐷", "🐙", "🦖", "👽", "🤖",
+  "🥷", "🧙", "🧛", "🧟",
+];
 
 let myUid = "";
 let myName = localStorage.getItem(LS_NAME) ?? "";
+let myAvatar = localStorage.getItem(LS_AVATAR) ?? AVATARS[0];
 
 let code: string | null = localStorage.getItem(LS_CODE);
 let game: GameDoc | null = null;
@@ -105,6 +114,14 @@ function nameOf(uid: string): string {
   return players.find((p) => p.uid === uid)?.name ?? "?";
 }
 
+function avatarOf(uid: string): string {
+  return players.find((p) => p.uid === uid)?.avatar ?? "❔";
+}
+
+function tagOf(uid: string): string {
+  return `${avatarOf(uid)} ${escapeHtml(nameOf(uid))}`;
+}
+
 function escapeHtml(s: string): string {
   const div = document.createElement("div");
   div.textContent = s;
@@ -131,6 +148,13 @@ function renderHome(): void {
       <label>השם שלך</label>
       <input id="name" maxlength="20" value="${escapeHtml(myName)}" placeholder="לדוגמה: דנה" />
 
+      <label>בחרו אווטאר</label>
+      <div class="avatar-picker">
+        ${AVATARS.map(
+          (a) => `<button class="avatar-choice${a === myAvatar ? " selected" : ""}" data-avatar="${a}">${a}</button>`,
+        ).join("")}
+      </div>
+
       <div class="card">
         <h2>התחילו משחק חדש</h2>
         <button id="create">צור משחק</button>
@@ -151,9 +175,17 @@ function renderHome(): void {
     localStorage.setItem(LS_NAME, myName);
   });
 
+  app.querySelectorAll<HTMLButtonElement>(".avatar-choice").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      myAvatar = btn.dataset.avatar!;
+      localStorage.setItem(LS_AVATAR, myAvatar);
+      render();
+    });
+  });
+
   app.querySelector("#create")!.addEventListener("click", async () => {
     if (!myName.trim()) return alert("קודם תכניסו שם");
-    const c = await createGame(myUid, myName.trim());
+    const c = await createGame(myUid, myName.trim(), myAvatar);
     history.replaceState(null, "", location.pathname);
     setCode(c);
   });
@@ -170,7 +202,7 @@ function renderHome(): void {
       return;
     }
     joinError = "";
-    await joinGame(c, myUid, myName.trim());
+    await joinGame(c, myUid, myName.trim(), myAvatar);
     history.replaceState(null, "", location.pathname);
     setCode(c);
   });
@@ -183,11 +215,12 @@ function renderLobby(): void {
     <div class="screen lobby">
       <h1>לובי</h1>
       <div class="join-code">${g.code}</div>
-      <p class="hint">שתפו את הקוד הזה — כולם מצטרפים עם אותו קוד.</p>
+      <div class="qr-wrap"><img id="qr" alt="QR להצטרפות" /></div>
+      <p class="hint">שתפו את הקוד או סרקו את ה-QR — שתי הדרכים מצטרפות לאותו משחק.</p>
 
       <h2>שחקנים (${players.length})</h2>
       <ul class="players">
-        ${players.map((p) => `<li>${escapeHtml(p.name)}${p.uid === g.hostUid ? " 👑" : ""}</li>`).join("")}
+        ${players.map((p) => `<li>${p.avatar} ${escapeHtml(p.name)}${p.uid === g.hostUid ? " 👑" : ""}</li>`).join("")}
       </ul>
 
       <h2>נושאים</h2>
@@ -233,6 +266,14 @@ function renderLobby(): void {
   }
 
   app.querySelector("#leave")!.addEventListener("click", leaveGame);
+
+  const joinUrl = `${location.origin}${location.pathname}?code=${g.code}`;
+  const qrImg = app.querySelector<HTMLImageElement>("#qr")!;
+  QRCode.toDataURL(joinUrl, { margin: 1, width: 220 })
+    .then((url) => {
+      qrImg.src = url;
+    })
+    .catch(() => {});
 }
 
 function renderPlaying(): void {
@@ -248,7 +289,7 @@ function renderPlaying(): void {
       ${players
         .slice()
         .sort((a, b) => b.score - a.score)
-        .map((p) => `<li${p.uid === myUid ? ' class="me"' : ""}>${escapeHtml(p.name)} — ${p.score}</li>`)
+        .map((p) => `<li${p.uid === myUid ? ' class="me"' : ""}>${p.avatar} ${escapeHtml(p.name)} — ${p.score}</li>`)
         .join("")}
     </ul>
   `;
@@ -270,7 +311,7 @@ function renderPlaying(): void {
       `;
     } else {
       main = `
-        <h1>${escapeHtml(nameOf(r.askerUid))} שואל/ת…</h1>
+        <h1>${tagOf(r.askerUid)} שואל/ת…</h1>
         <p class="hint">התכוננו ללחוץ!</p>
       `;
     }
@@ -284,7 +325,7 @@ function renderPlaying(): void {
       `;
     } else {
       main = `
-        <h1>${escapeHtml(nameOf(r.askerUid))} שאל/ה שאלה</h1>
+        <h1>${tagOf(r.askerUid)} שאל/ה שאלה</h1>
         ${r.topic ? `<p class="hint">נושא: ${escapeHtml(r.topic)}</p>` : ""}
         <button id="buzz" class="buzz-btn" ${iAlreadyBuzzed ? "disabled" : ""}>
           ${iAlreadyBuzzed ? "לחצת!" : "לחץ!"}
@@ -350,7 +391,7 @@ function renderBuzzList(list: Buzz[], top: Buzz | undefined): string {
                  <button class="judge-wrong" data-uid="${b.uid}">✘ לא נכון</button>`
               : "";
           const tag = b.judgement === "correct" ? " ✔" : b.judgement === "wrong" ? " ✘" : "";
-          return `<li class="${isTop ? "top" : ""}">${escapeHtml(b.name)}${tag}${judgeButtons}</li>`;
+          return `<li class="${isTop ? "top" : ""}">${avatarOf(b.uid)} ${escapeHtml(b.name)}${tag}${judgeButtons}</li>`;
         })
         .join("")}
     </ol>
@@ -363,7 +404,7 @@ function renderEnded(): void {
     <div class="screen ended">
       <h1>🏆 המשחק נגמר!</h1>
       <ol class="final-scoreboard">
-        ${sorted.map((p) => `<li>${escapeHtml(p.name)} — ${p.score}</li>`).join("")}
+        ${sorted.map((p) => `<li>${p.avatar} ${escapeHtml(p.name)} — ${p.score}</li>`).join("")}
       </ol>
       <button id="again">משחק חדש</button>
     </div>

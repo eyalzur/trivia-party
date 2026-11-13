@@ -14,6 +14,7 @@ export interface GameDoc {
 
 export interface PlayerDoc {
   name: string;
+  avatar: string;
   score: number;
   joinedAt: unknown;
 }
