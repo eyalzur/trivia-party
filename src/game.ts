@@ -10,11 +10,11 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
-  type Timestamp,
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Buzz, BuzzDoc, GameDoc, Player, PlayerDoc, RoundDoc } from "./types";
+import type { Answer, AnswerDoc, GameDoc, Player, PlayerDoc, RoundDoc } from "./types";
+import { QUESTION_DURATION_MS } from "./types";
 import { usedKey } from "./questions";
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -39,11 +39,16 @@ function playerRef(code: string, uid: string) {
 function roundRef(code: string, turnIndex: number) {
   return doc(db, "games", code, "rounds", String(turnIndex));
 }
-function buzzesCol(code: string, turnIndex: number) {
-  return collection(db, "games", code, "rounds", String(turnIndex), "buzzes");
+function answersCol(code: string, turnIndex: number) {
+  return collection(db, "games", code, "rounds", String(turnIndex), "answers");
 }
-function buzzRef(code: string, turnIndex: number, uid: string) {
-  return doc(db, "games", code, "rounds", String(turnIndex), "buzzes", uid);
+function answerRef(code: string, turnIndex: number, uid: string) {
+  return doc(db, "games", code, "rounds", String(turnIndex), "answers", uid);
+}
+
+export function calcPoints(elapsedMs: number): number {
+  const clamped = Math.max(0, Math.min(QUESTION_DURATION_MS, elapsedMs));
+  return 500 + Math.round(500 * (1 - clamped / QUESTION_DURATION_MS));
 }
 
 export async function createGame(
@@ -104,19 +109,13 @@ export function subscribeRound(
   });
 }
 
-export function subscribeBuzzes(
+export function subscribeAnswers(
   code: string,
   turnIndex: number,
-  cb: (buzzes: Buzz[]) => void,
+  cb: (answers: Answer[]) => void,
 ): Unsubscribe {
-  return onSnapshot(query(buzzesCol(code, turnIndex), orderBy("at", "asc")), (snap) => {
-    cb(
-      snap.docs.map((d) => {
-        const data = d.data() as BuzzDoc;
-        const at = data.at as Timestamp | null;
-        return { uid: d.id, ...data, atMs: at ? at.toMillis() : null };
-      }),
-    );
+  return onSnapshot(answersCol(code, turnIndex), (snap) => {
+    cb(snap.docs.map((d) => ({ uid: d.id, ...(d.data() as AnswerDoc) })));
   });
 }
 
@@ -129,38 +128,54 @@ export async function startGame(code: string, order: string[]): Promise<void> {
     askerUid: order[0],
     categoryKey: null,
     questionId: null,
+    choices: null,
+    correctIndex: null,
     status: "asking",
     openedAt: null,
   } satisfies RoundDoc);
   await updateDoc(gameRef(code), { status: "playing", order, turnIndex: 0 });
 }
 
-export async function openBuzzing(
+export async function startQuestion(
   code: string,
   turnIndex: number,
   categoryKey: string,
   questionId: string,
+  choices: string[],
+  correctIndex: number,
 ): Promise<void> {
   await updateDoc(roundRef(code, turnIndex), {
     categoryKey,
     questionId,
-    status: "buzzing",
+    choices,
+    correctIndex,
+    status: "question",
     openedAt: serverTimestamp(),
   });
   await updateDoc(gameRef(code), { usedQuestions: arrayUnion(usedKey(categoryKey, questionId)) });
 }
 
-export async function submitBuzz(
+export async function submitAnswer(
   code: string,
   turnIndex: number,
   uid: string,
   name: string,
+  choiceIndex: number,
+  elapsedMs: number,
+  correct: boolean,
 ): Promise<void> {
-  const buzz: BuzzDoc = { name, at: serverTimestamp(), judgement: "pending" };
-  await setDoc(buzzRef(code, turnIndex, uid), buzz);
+  const answer: AnswerDoc = { name, choiceIndex, elapsedMs, at: serverTimestamp() };
+  await setDoc(answerRef(code, turnIndex, uid), answer);
+  if (correct) {
+    await updateDoc(playerRef(code, uid), { score: increment(calcPoints(elapsedMs)) });
+  }
 }
 
-async function advanceTurn(code: string, game: GameDoc): Promise<void> {
+export async function finishQuestion(code: string, turnIndex: number): Promise<void> {
+  await updateDoc(roundRef(code, turnIndex), { status: "done" });
+}
+
+export async function advanceTurn(code: string, game: GameDoc): Promise<void> {
   const nextIndex = game.turnIndex + 1;
   if (nextIndex >= game.order.length) {
     await updateDoc(gameRef(code), { status: "ended" });
@@ -170,29 +185,10 @@ async function advanceTurn(code: string, game: GameDoc): Promise<void> {
     askerUid: game.order[nextIndex],
     categoryKey: null,
     questionId: null,
+    choices: null,
+    correctIndex: null,
     status: "asking",
     openedAt: null,
   } satisfies RoundDoc);
   await updateDoc(gameRef(code), { turnIndex: nextIndex });
-}
-
-export async function judgeBuzz(
-  code: string,
-  game: GameDoc,
-  buzzUid: string,
-  correct: boolean,
-): Promise<void> {
-  await updateDoc(buzzRef(code, game.turnIndex, buzzUid), {
-    judgement: correct ? "correct" : "wrong",
-  });
-  if (correct) {
-    await updateDoc(playerRef(code, buzzUid), { score: increment(1) });
-    await updateDoc(roundRef(code, game.turnIndex), { status: "done" });
-    await advanceTurn(code, game);
-  }
-}
-
-export async function endRoundNoWinner(code: string, game: GameDoc): Promise<void> {
-  await updateDoc(roundRef(code, game.turnIndex), { status: "done" });
-  await advanceTurn(code, game);
 }

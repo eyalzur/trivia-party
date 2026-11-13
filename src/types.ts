@@ -1,6 +1,7 @@
 export type GameStatus = "lobby" | "playing" | "ended";
-export type RoundStatus = "asking" | "buzzing" | "done";
-export type BuzzJudgement = "pending" | "correct" | "wrong";
+export type RoundStatus = "asking" | "question" | "done";
+
+export const QUESTION_DURATION_MS = 10000;
 
 export interface GameDoc {
   code: string;
@@ -25,21 +26,23 @@ export interface RoundDoc {
   askerUid: string;
   categoryKey: string | null;
   questionId: string | null;
+  choices: string[] | null;
+  correctIndex: number | null;
   status: RoundStatus;
   openedAt: unknown | null;
 }
 
-export interface BuzzDoc {
+export interface AnswerDoc {
   name: string;
+  choiceIndex: number;
+  elapsedMs: number;
   at: unknown;
-  judgement: BuzzJudgement;
 }
 
 export interface Player extends PlayerDoc {
   uid: string;
 }
 
-export interface Buzz extends BuzzDoc {
+export interface Answer extends AnswerDoc {
   uid: string;
-  atMs: number | null;
 }

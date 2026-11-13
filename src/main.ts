@@ -3,22 +3,24 @@ import QRCode from "qrcode";
 import jsQR from "jsqr";
 import { waitForUid } from "./firebase";
 import {
+  advanceTurn,
+  calcPoints,
   createGame,
-  endRoundNoWinner,
+  finishQuestion,
   getGameOnce,
   joinGame,
-  judgeBuzz,
-  openBuzzing,
   setTopics,
   startGame,
-  subscribeBuzzes,
+  startQuestion,
+  subscribeAnswers,
   subscribeGame,
   subscribePlayers,
   subscribeRound,
-  submitBuzz,
+  submitAnswer,
 } from "./game";
-import type { Buzz, GameDoc, Player, RoundDoc } from "./types";
-import { CATEGORIES, getCategory, getQuestion, pickRandomQuestion } from "./questions";
+import type { Answer, GameDoc, Player, RoundDoc } from "./types";
+import { QUESTION_DURATION_MS } from "./types";
+import { CATEGORIES, getCategory, getQuestion, pickRandomQuestion, shuffledChoices } from "./questions";
 import { CHANGELOG } from "./changelog";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -42,10 +44,16 @@ let code: string | null = localStorage.getItem(LS_CODE);
 let game: GameDoc | null = null;
 let players: Player[] = [];
 let round: RoundDoc | null = null;
-let buzzes: Buzz[] = [];
-let localQuestion: { categoryKey: string; questionId: string } | null = null;
+let answers: Answer[] = [];
+let localQuestion:
+  | { categoryKey: string; questionId: string; text: string; choices: string[]; correctIndex: number }
+  | null = null;
+let myPendingChoice: number | null = null;
+let questionStartMs: number | null = null;
+let questionTimerId: number | null = null;
+let questionEndTriggered = false;
 let joinError = "";
-let celebratedUids = new Set<string>();
+let celebratedThisRound = false;
 
 type HomeStep = "profile" | "gameName" | "join";
 let homeStep: HomeStep = "profile";
@@ -56,25 +64,50 @@ let editingProfile = false;
 let unsubGame: (() => void) | null = null;
 let unsubPlayers: (() => void) | null = null;
 let unsubRound: (() => void) | null = null;
-let unsubBuzzes: (() => void) | null = null;
+let unsubAnswers: (() => void) | null = null;
 
 function teardown(): void {
   unsubGame?.();
   unsubPlayers?.();
   unsubRound?.();
-  unsubBuzzes?.();
-  unsubGame = unsubPlayers = unsubRound = unsubBuzzes = null;
+  unsubAnswers?.();
+  unsubGame = unsubPlayers = unsubRound = unsubAnswers = null;
   round = null;
-  buzzes = [];
+  answers = [];
+  stopQuestionTimer();
 }
 
 function teardownRound(): void {
   unsubRound?.();
-  unsubBuzzes?.();
+  unsubAnswers?.();
   unsubRound = null;
-  unsubBuzzes = null;
-  buzzes = [];
-  celebratedUids = new Set();
+  unsubAnswers = null;
+  answers = [];
+  myPendingChoice = null;
+  questionStartMs = null;
+  questionEndTriggered = false;
+  celebratedThisRound = false;
+  stopQuestionTimer();
+}
+
+function stopQuestionTimer(): void {
+  if (questionTimerId !== null) {
+    clearInterval(questionTimerId);
+    questionTimerId = null;
+  }
+}
+
+function startQuestionTimer(c: string, turnIndex: number): void {
+  stopQuestionTimer();
+  questionTimerId = window.setInterval(() => {
+    const elapsed = questionStartMs !== null ? Date.now() - questionStartMs : 0;
+    if (elapsed >= QUESTION_DURATION_MS && !questionEndTriggered) {
+      questionEndTriggered = true;
+      stopQuestionTimer();
+      void finishQuestion(c, turnIndex);
+    }
+    render();
+  }, 250);
 }
 
 function watchGame(c: string): void {
@@ -90,18 +123,29 @@ function watchGame(c: string): void {
       lastTurnIndex = g.turnIndex;
       localQuestion = null;
       teardownRound();
+      let prevStatus: RoundDoc["status"] | null = null;
       unsubRound = subscribeRound(c, g.turnIndex, (r) => {
-        round = r;
-        render();
-      });
-      unsubBuzzes = subscribeBuzzes(c, g.turnIndex, (b) => {
-        buzzes = b;
-        for (const bz of b) {
-          if (bz.judgement === "correct" && !celebratedUids.has(bz.uid)) {
-            celebratedUids.add(bz.uid);
+        if (r && r.status === "question" && prevStatus !== "question") {
+          questionStartMs = Date.now();
+          questionEndTriggered = false;
+          startQuestionTimer(c, g.turnIndex);
+        }
+        if (r && r.status !== "question") {
+          stopQuestionTimer();
+        }
+        if (r && r.status === "done" && prevStatus !== "done" && !celebratedThisRound) {
+          const anyCorrect = answers.some((ans) => ans.choiceIndex === r.correctIndex);
+          if (anyCorrect) {
+            celebratedThisRound = true;
             fireConfetti();
           }
         }
+        prevStatus = r?.status ?? null;
+        round = r;
+        render();
+      });
+      unsubAnswers = subscribeAnswers(c, g.turnIndex, (a) => {
+        answers = a;
         render();
       });
     }
@@ -644,13 +688,15 @@ async function shareJoinQr(canvas: HTMLCanvasElement, joinUrl: string, code: str
   }
 }
 
+const CHOICE_LETTERS = ["א", "ב", "ג", "ד"];
+const CHOICE_CLASSES = ["choice-a", "choice-b", "choice-c", "choice-d"];
+
 function renderPlaying(): void {
   const g = game!;
   const r = round;
   const myScore = players.find((p) => p.uid === myUid)?.score ?? 0;
   const amAsker = r?.askerUid === myUid;
-  const iAlreadyBuzzed = buzzes.some((b) => b.uid === myUid);
-  const topBuzz = buzzes.find((b) => b.judgement === "pending");
+  const myAnswer = answers.find((a) => a.uid === myUid);
   const scoreboard = renderScoreboardRows(players, myUid);
   const oldRects = captureRects(".scoreboard .score-row");
 
@@ -662,50 +708,75 @@ function renderPlaying(): void {
       const categoryOptions = g.topics
         .map((key) => `<button class="pick-category" data-category="${key}">${escapeHtml(getCategory(key)?.label ?? key)}</button>`)
         .join("");
-      const picked = localQuestion ? getQuestion(localQuestion.categoryKey, localQuestion.questionId) : undefined;
       main = `
         <h1>התור שלך לשאול!</h1>
-        <p class="hint">בחרו קטגוריה, קראו את השאלה בקול, ואז פתחו את הבאזרים.</p>
+        <p class="hint">בחרו קטגוריה, קראו את השאלה בקול, ואז התחילו כדי שכולם יראו את האפשרויות.</p>
         <div class="topic-picker">${categoryOptions}</div>
         ${
-          picked
+          localQuestion
             ? `<div class="question-reveal">
-                <p class="hint">${escapeHtml(getCategory(localQuestion!.categoryKey)?.label ?? "")}</p>
-                <p class="question-text">${escapeHtml(picked.q)}</p>
-                <p class="answer-text">תשובה: ${escapeHtml(picked.a)}</p>
+                <p class="hint">${escapeHtml(getCategory(localQuestion.categoryKey)?.label ?? "")}</p>
+                <p class="question-text">${escapeHtml(localQuestion.text)}</p>
+                ${renderChoiceGrid(localQuestion.choices, localQuestion.correctIndex, null, true)}
               </div>
-              <button id="openBuzzing" class="primary big">שאלתי — פתחו את הבאזרים!</button>`
+              <button id="startQuestion" class="primary big">קראתי — התחילו!</button>`
             : ""
         }
       `;
     } else {
       main = `
         <h1>${tagOf(r.askerUid)} שואל/ת…</h1>
-        <p class="hint">התכוננו ללחוץ!</p>
+        <p class="hint">התכוננו לענות!</p>
       `;
     }
-  } else if (r.status === "buzzing") {
-    const question = r.categoryKey && r.questionId ? getQuestion(r.categoryKey, r.questionId) : undefined;
+  } else if (r.status === "question") {
     const categoryLabel = r.categoryKey ? getCategory(r.categoryKey)?.label : undefined;
+    const questionText =
+      r.categoryKey && r.questionId ? getQuestion(r.categoryKey, r.questionId)?.q : undefined;
+    const elapsed = questionStartMs !== null ? Date.now() - questionStartMs : 0;
+    const remainingMs = Math.max(0, QUESTION_DURATION_MS - elapsed);
+    const remainingSec = Math.ceil(remainingMs / 1000);
+    const pct = Math.max(0, Math.min(100, (remainingMs / QUESTION_DURATION_MS) * 100));
+    const timerBar = `
+      <div class="timer-bar"><div class="timer-bar-fill" style="width:${pct}%"></div></div>
+      <p class="hint">${remainingSec} שניות</p>
+    `;
     if (amAsker) {
       main = `
-        <h1>מי לחץ ראשון?</h1>
+        <h1>מי יענה נכון?</h1>
         ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
-        ${question ? `<p class="question-text">${escapeHtml(question.q)}</p><p class="answer-text">תשובה: ${escapeHtml(question.a)}</p>` : ""}
-        ${renderBuzzList(buzzes, topBuzz)}
-        <button id="noWinner" class="secondary">אף אחד לא ידע — לתור הבא</button>
+        ${questionText ? `<p class="question-text">${escapeHtml(questionText)}</p>` : ""}
+        ${timerBar}
+        ${renderChoiceGrid(r.choices ?? [], null, null, true)}
+        <p class="hint">${answers.length} מתוך ${Math.max(players.length - 1, 0)} ענו</p>
       `;
     } else {
+      const choiceIndex = myAnswer ? myAnswer.choiceIndex : (myPendingChoice ?? null);
       main = `
         <h1>${tagOf(r.askerUid)} שאל/ה שאלה</h1>
         ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
-        ${question ? `<p class="question-text">${escapeHtml(question.q)}</p>` : ""}
-        <button id="buzz" class="buzz-btn" ${iAlreadyBuzzed ? "disabled" : ""}>
-          ${iAlreadyBuzzed ? "לחצת!" : "לחץ!"}
-        </button>
-        ${renderBuzzList(buzzes, topBuzz)}
+        ${questionText ? `<p class="question-text">${escapeHtml(questionText)}</p>` : ""}
+        ${timerBar}
+        ${renderChoiceGrid(r.choices ?? [], null, choiceIndex, choiceIndex !== null)}
       `;
     }
+  } else if (r.status === "done") {
+    const category = r.categoryKey ? getCategory(r.categoryKey) : undefined;
+    const categoryLabel = category?.label;
+    const questionText =
+      r.categoryKey && r.questionId ? getQuestion(r.categoryKey, r.questionId)?.q : undefined;
+    main = `
+      <h1>${amAsker ? "התוצאות!" : `${tagOf(r.askerUid)} שאל/ה`}</h1>
+      ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
+      ${questionText ? `<p class="question-text">${escapeHtml(questionText)}</p>` : ""}
+      ${renderChoiceGrid(r.choices ?? [], r.correctIndex, myAnswer ? myAnswer.choiceIndex : null, true)}
+      ${renderAnswerResults(answers, r.correctIndex)}
+      ${
+        amAsker
+          ? `<button id="nextQuestion" class="primary big">לשאלה הבאה</button>`
+          : "<p class='hint'>ממתינים לשאלה הבאה…</p>"
+      }
+    `;
   }
 
   app.innerHTML = `
@@ -726,50 +797,85 @@ function renderPlaying(): void {
       const categoryKey = btn.dataset.category!;
       const question = pickRandomQuestion(categoryKey, g.usedQuestions);
       if (!question) return;
-      localQuestion = { categoryKey, questionId: question.id };
+      const { choices, correctIndex } = shuffledChoices(question);
+      localQuestion = { categoryKey, questionId: question.id, text: question.q, choices, correctIndex };
       render();
     });
   });
 
-  app.querySelector("#openBuzzing")?.addEventListener("click", async () => {
+  app.querySelector("#startQuestion")?.addEventListener("click", async () => {
     if (!localQuestion) return;
-    await openBuzzing(g.code, g.turnIndex, localQuestion.categoryKey, localQuestion.questionId);
+    await startQuestion(
+      g.code,
+      g.turnIndex,
+      localQuestion.categoryKey,
+      localQuestion.questionId,
+      localQuestion.choices,
+      localQuestion.correctIndex,
+    );
   });
 
-  app.querySelector("#buzz")?.addEventListener("click", async () => {
-    await submitBuzz(g.code, g.turnIndex, myUid, myName);
-  });
-
-  app.querySelector("#noWinner")?.addEventListener("click", async () => {
-    await endRoundNoWinner(g.code, g);
-  });
-
-  app.querySelectorAll<HTMLButtonElement>(".judge-correct").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      await judgeBuzz(g.code, g, btn.dataset.uid!, true);
+  if (r?.status === "question" && !amAsker) {
+    app.querySelectorAll<HTMLButtonElement>(".choice-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (myAnswer || myPendingChoice !== null) return;
+        const choiceIndex = Number(btn.dataset.index);
+        myPendingChoice = choiceIndex;
+        render();
+        const elapsedMs = questionStartMs !== null ? Date.now() - questionStartMs : 0;
+        const correct = choiceIndex === r.correctIndex;
+        await submitAnswer(g.code, g.turnIndex, myUid, myName, choiceIndex, elapsedMs, correct);
+      });
     });
-  });
-  app.querySelectorAll<HTMLButtonElement>(".judge-wrong").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      await judgeBuzz(g.code, g, btn.dataset.uid!, false);
-    });
+  }
+
+  app.querySelector("#nextQuestion")?.addEventListener("click", async () => {
+    await advanceTurn(g.code, g);
   });
 }
 
-function renderBuzzList(list: Buzz[], top: Buzz | undefined): string {
-  if (!list.length) return "<p class='hint'>ממתינים ללחיצות…</p>";
+function renderChoiceGrid(
+  choices: string[],
+  correctIndex: number | null,
+  selectedIndex: number | null,
+  disabled: boolean,
+): string {
+  if (!choices.length) return "";
+  return `
+    <div class="choice-grid-answers">
+      ${choices
+        .map((text, i) => {
+          const isCorrect = correctIndex !== null && i === correctIndex;
+          const isWrongPick = correctIndex !== null && selectedIndex === i && i !== correctIndex;
+          const isSelected = selectedIndex === i;
+          const classes = [
+            "choice-btn",
+            CHOICE_CLASSES[i],
+            isCorrect ? "reveal-correct" : "",
+            isWrongPick ? "reveal-wrong" : "",
+            isSelected && correctIndex === null ? "picked" : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          return `<button class="${classes}" data-index="${i}" ${disabled ? "disabled" : ""}>
+            <span class="choice-letter">${CHOICE_LETTERS[i]}</span><span>${escapeHtml(text)}</span>
+          </button>`;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function renderAnswerResults(list: Answer[], correctIndex: number | null): string {
+  if (!list.length) return "<p class='hint'>אף אחד לא הספיק לענות.</p>";
+  const sorted = list.slice().sort((a, b) => a.elapsedMs - b.elapsedMs);
   return `
     <ol class="buzz-list">
-      ${list
-        .map((b) => {
-          const isTop = b.uid === top?.uid;
-          const judgeButtons =
-            isTop && b.judgement === "pending"
-              ? `<button class="judge-correct" data-uid="${b.uid}">✔ נכון</button>
-                 <button class="judge-wrong" data-uid="${b.uid}">✘ לא נכון</button>`
-              : "";
-          const tag = b.judgement === "correct" ? " ✔" : b.judgement === "wrong" ? " ✘" : "";
-          return `<li class="${isTop ? "top" : ""}">${avatarOf(b.uid)} ${escapeHtml(b.name)}${tag}${judgeButtons}</li>`;
+      ${sorted
+        .map((a) => {
+          const correct = correctIndex !== null && a.choiceIndex === correctIndex;
+          const tag = correct ? ` ✔ +${calcPoints(a.elapsedMs)}` : " ✘";
+          return `<li>${avatarOf(a.uid)} ${escapeHtml(a.name)}${tag}</li>`;
         })
         .join("")}
     </ol>

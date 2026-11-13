@@ -1,10 +1,11 @@
 rules_version = '2';
 
 // Trust model: players are friends in the same room. Rules stop randoms
-// off the internet from touching data, and stop a buzz's timestamp from
-// being spoofed by the client (the one thing that actually decides a
-// round). They do not try to stop a dishonest player from editing their
-// own score field directly.
+// off the internet from touching data, and stop an answer's audit
+// timestamp from being spoofed by the client. Scoring itself (speed bonus)
+// is computed and written by each player's own client when they answer,
+// trusting their device clock — same spirit as not stopping a dishonest
+// player from editing their own score field directly via devtools.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -30,11 +31,11 @@ service cloud.firestore {
         allow create, update: if request.auth != null;
         allow delete: if false;
 
-        match /buzzes/{uid} {
+        match /answers/{uid} {
           allow read: if true;
           allow create: if request.auth != null && request.auth.uid == uid
             && request.resource.data.at == request.time;
-          allow update: if request.auth != null;
+          allow update: if false;
           allow delete: if false;
         }
       }

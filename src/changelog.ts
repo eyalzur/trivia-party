@@ -7,6 +7,12 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2.0",
+    emoji: "🧠",
+    title: "מעבר למשחק בסגנון קהוט",
+    desc: "במקום באזר: השואל קורא את השאלה, לוחץ 'התחילו', וכל השחקנים רואים 4 אפשרויות ועונים תוך 10 שניות. ניקוד לפי נכונות ומהירות.",
+  },
+  {
     version: "1.9",
     emoji: "🧑",
     title: "מסך בית נקי יותר",
