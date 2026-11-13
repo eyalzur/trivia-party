@@ -31,10 +31,76 @@ body {
 }
 
 #app {
+  position: relative;
+  z-index: 1;
   max-width: 480px;
   margin: 0 auto;
   padding: 16px;
   padding-bottom: 48px;
+}
+
+.ambient-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ambient-sun {
+  position: absolute;
+  top: -70px;
+  right: -70px;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 214, 120, 0.55), rgba(255, 214, 120, 0) 70%);
+  animation: sun-pulse 6s ease-in-out infinite;
+}
+
+@keyframes sun-pulse {
+  0%,
+  100% {
+    opacity: 0.65;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+.ambient-cloud {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  filter: blur(8px);
+  animation: cloud-drift linear infinite;
+}
+
+@keyframes cloud-drift {
+  from {
+    transform: translateX(-30vw);
+  }
+  to {
+    transform: translateX(130vw);
+  }
+}
+
+.ambient-petal {
+  position: fixed;
+  top: -30px;
+  font-size: 1.3rem;
+  z-index: 0;
+  pointer-events: none;
+  animation: petal-fall linear forwards;
+}
+
+@keyframes petal-fall {
+  to {
+    transform: translateY(115vh) translateX(var(--drift, 40px)) rotate(var(--spin, 180deg));
+    opacity: 0.25;
+  }
 }
 
 h1 {

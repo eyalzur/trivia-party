@@ -1096,7 +1096,33 @@ function renderEnded(): void {
   app.querySelector("#again")!.addEventListener("click", leaveGame);
 }
 
+function initAmbientBackground(): void {
+  const layer = document.createElement("div");
+  layer.className = "ambient-bg";
+  layer.innerHTML = `
+    <div class="ambient-sun"></div>
+    <div class="ambient-cloud" style="width:180px;height:60px;top:8%;animation-duration:38s;"></div>
+    <div class="ambient-cloud" style="width:260px;height:80px;top:20%;animation-duration:54s;animation-delay:-20s;"></div>
+    <div class="ambient-cloud" style="width:140px;height:50px;top:32%;animation-duration:46s;animation-delay:-9s;"></div>
+  `;
+  document.body.insertBefore(layer, document.body.firstChild);
+
+  const petals = ["🌸", "🍃", "✨", "🌺", "🍂"];
+  setInterval(() => {
+    const petal = document.createElement("span");
+    petal.className = "ambient-petal";
+    petal.textContent = petals[Math.floor(Math.random() * petals.length)];
+    petal.style.left = `${Math.random() * 100}%`;
+    petal.style.setProperty("--drift", `${(Math.random() - 0.5) * 120}px`);
+    petal.style.setProperty("--spin", `${(Math.random() - 0.5) * 360}deg`);
+    petal.style.animationDuration = `${9 + Math.random() * 6}s`;
+    document.body.appendChild(petal);
+    setTimeout(() => petal.remove(), 16000);
+  }, 2600);
+}
+
 async function boot(): Promise<void> {
+  initAmbientBackground();
   try {
     myUid = await waitForUid();
   } catch (err) {
