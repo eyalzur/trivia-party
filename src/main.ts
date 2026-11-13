@@ -856,7 +856,7 @@ function renderPlaying(): void {
             ? `<div class="question-reveal">
                 <p class="hint">${escapeHtml(getCategory(localQuestion.categoryKey)?.label ?? "")}</p>
                 <p class="question-text">${escapeHtml(localQuestion.text)}</p>
-                ${renderChoiceGrid(localQuestion.choices, localQuestion.correctIndex, null, true)}
+                ${renderChoiceGrid(localQuestion.choices, localQuestion.correctIndex, null, true, undefined, true)}
               </div>
               <button id="startQuestion" class="primary big">קראתי — התחילו!</button>`
             : ""
@@ -912,7 +912,7 @@ function renderPlaying(): void {
       <h1>${amAsker ? "התוצאות!" : `${tagOf(r.askerUid)} שאל/ה`}</h1>
       ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
       ${questionText ? `<p class="question-text">${escapeHtml(questionText)}</p>` : ""}
-      ${renderChoiceGrid(r.choices ?? [], r.correctIndex, myAnswer ? myAnswer.choiceIndex : null, true)}
+      ${renderChoiceGrid(r.choices ?? [], r.correctIndex, myAnswer ? myAnswer.choiceIndex : null, true, undefined, true)}
       ${renderAnswerResults(answers, r.correctIndex)}
       ${
         amAsker
@@ -1036,6 +1036,7 @@ function renderChoiceGrid(
   selectedIndex: number | null,
   disabled: boolean,
   liveElapsedMs?: number,
+  entrance = false,
 ): string {
   if (!choices.length) return "";
   return `
@@ -1053,13 +1054,16 @@ function renderChoiceGrid(
             isWrongPick ? "reveal-wrong" : "",
             isSelected && correctIndex === null ? "picked" : "",
             isLive ? "scan" : "",
+            entrance ? "enter" : "",
           ]
             .filter(Boolean)
             .join(" ");
-          const scanStyle = isLive
-            ? ` style="animation-delay:${i * 0.05}s, -${(((liveElapsedMs ?? 0) / 1000 + i * 1.2) % 4.8).toFixed(3)}s"`
-            : "";
-          return `<button class="${classes}" data-index="${i}" ${disabled ? "disabled" : ""}${scanStyle}>
+          const style = isLive
+            ? ` style="animation-delay:-${(((liveElapsedMs ?? 0) / 1000 + i * 1.2) % 4.8).toFixed(3)}s"`
+            : entrance
+              ? ` style="animation-delay:${i * 0.05}s"`
+              : "";
+          return `<button class="${classes}" data-index="${i}" ${disabled ? "disabled" : ""}${style}>
             <span class="choice-letter">${CHOICE_LETTERS[i]}</span><span>${escapeHtml(text)}</span>
           </button>`;
         })
