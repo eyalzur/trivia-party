@@ -155,6 +155,16 @@ export function pickRandomQuestion(categoryKey: string, usedKeys: string[]): Que
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+export function pickRandomQuestionFromTopics(
+  topics: string[],
+  usedKeys: string[],
+): { categoryKey: string; question: Question } | undefined {
+  const pool = topics.length ? topics : CATEGORIES.map((c) => c.key);
+  const categoryKey = pool[Math.floor(Math.random() * pool.length)];
+  const question = pickRandomQuestion(categoryKey, usedKeys);
+  return question ? { categoryKey, question } : undefined;
+}
+
 export function shuffledChoices(q: Question): { choices: string[]; correctIndex: number } {
   const choices = [q.a, ...q.wrong];
   for (let i = choices.length - 1; i > 0; i--) {

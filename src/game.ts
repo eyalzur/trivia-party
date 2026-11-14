@@ -15,7 +15,7 @@ import {
 import { db } from "./firebase";
 import type { Answer, AnswerDoc, GameDoc, Player, PlayerDoc, RoundDoc } from "./types";
 import { DEFAULT_TOTAL_QUESTIONS, QUESTION_DURATION_MS } from "./types";
-import { usedKey } from "./questions";
+import { pickRandomQuestionFromTopics, shuffledChoices, usedKey } from "./questions";
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -51,15 +51,6 @@ export function calcPoints(elapsedMs: number, durationMs: number = QUESTION_DURA
   return 500 + Math.round(500 * (1 - clamped / durationMs));
 }
 
-export function buildOrder(playerUids: string[], totalQuestions: number): string[] {
-  if (!playerUids.length) return [];
-  const order: string[] = [];
-  for (let i = 0; i < totalQuestions; i++) {
-    order.push(playerUids[i % playerUids.length]);
-  }
-  return order;
-}
-
 export async function createGame(
   hostUid: string,
   playerName: string,
@@ -78,7 +69,6 @@ export async function createGame(
     hostUid,
     status: "lobby",
     topics: [],
-    order: [],
     turnIndex: 0,
     usedQuestions: [],
     totalQuestions: DEFAULT_TOTAL_QUESTIONS,
@@ -142,36 +132,31 @@ export async function setGameSettings(
   await updateDoc(gameRef(code), { totalQuestions, questionDurationMs });
 }
 
-export async function startGame(code: string, order: string[]): Promise<void> {
-  await setDoc(roundRef(code, 0), {
-    askerUid: order[0],
-    categoryKey: null,
-    questionId: null,
-    choices: null,
-    correctIndex: null,
-    status: "asking",
-    openedAt: null,
-  } satisfies RoundDoc);
-  await updateDoc(gameRef(code), { status: "playing", order, turnIndex: 0 });
-}
-
-export async function startQuestion(
+async function writeRound(
   code: string,
   turnIndex: number,
-  categoryKey: string,
-  questionId: string,
-  choices: string[],
-  correctIndex: number,
+  topics: string[],
+  usedQuestions: string[],
 ): Promise<void> {
-  await updateDoc(roundRef(code, turnIndex), {
-    categoryKey,
-    questionId,
+  const picked = pickRandomQuestionFromTopics(topics, usedQuestions);
+  if (!picked) return;
+  const { choices, correctIndex } = shuffledChoices(picked.question);
+  await setDoc(roundRef(code, turnIndex), {
+    categoryKey: picked.categoryKey,
+    questionId: picked.question.id,
     choices,
     correctIndex,
     status: "question",
     openedAt: serverTimestamp(),
+  } satisfies RoundDoc);
+  await updateDoc(gameRef(code), {
+    usedQuestions: arrayUnion(usedKey(picked.categoryKey, picked.question.id)),
   });
-  await updateDoc(gameRef(code), { usedQuestions: arrayUnion(usedKey(categoryKey, questionId)) });
+}
+
+export async function startGame(code: string, topics: string[]): Promise<void> {
+  await writeRound(code, 0, topics, []);
+  await updateDoc(gameRef(code), { status: "playing", turnIndex: 0 });
 }
 
 export async function submitAnswer(
@@ -197,18 +182,10 @@ export async function finishQuestion(code: string, turnIndex: number): Promise<v
 
 export async function advanceTurn(code: string, game: GameDoc): Promise<void> {
   const nextIndex = game.turnIndex + 1;
-  if (nextIndex >= game.order.length) {
+  if (nextIndex >= (game.totalQuestions ?? DEFAULT_TOTAL_QUESTIONS)) {
     await updateDoc(gameRef(code), { status: "ended" });
     return;
   }
-  await setDoc(roundRef(code, nextIndex), {
-    askerUid: game.order[nextIndex],
-    categoryKey: null,
-    questionId: null,
-    choices: null,
-    correctIndex: null,
-    status: "asking",
-    openedAt: null,
-  } satisfies RoundDoc);
+  await writeRound(code, nextIndex, game.topics, game.usedQuestions);
   await updateDoc(gameRef(code), { turnIndex: nextIndex });
 }

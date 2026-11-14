@@ -4,7 +4,6 @@ import jsQR from "jsqr";
 import { waitForUid } from "./firebase";
 import {
   advanceTurn,
-  buildOrder,
   calcPoints,
   createGame,
   finishQuestion,
@@ -13,7 +12,6 @@ import {
   setGameSettings,
   setTopics,
   startGame,
-  startQuestion,
   subscribeAnswers,
   subscribeGame,
   subscribePlayers,
@@ -28,7 +26,7 @@ const SPEED_PRESETS = [
   { ms: 10000, label: "⚡ רגיל", sub: "10 שנ׳" },
   { ms: 5000, label: "🔥 מהיר", sub: "5 שנ׳" },
 ];
-import { CATEGORIES, getCategory, getQuestion, pickRandomQuestion, shuffledChoices } from "./questions";
+import { CATEGORIES, getCategory, getQuestion } from "./questions";
 import { CHANGELOG } from "./changelog";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -53,9 +51,6 @@ let game: GameDoc | null = null;
 let players: Player[] = [];
 let round: RoundDoc | null = null;
 let answers: Answer[] = [];
-let localQuestion:
-  | { categoryKey: string; questionId: string; text: string; choices: string[]; correctIndex: number }
-  | null = null;
 let myPendingChoice: number | null = null;
 let questionStartMs: number | null = null;
 let questionTimerId: number | null = null;
@@ -136,7 +131,6 @@ function watchGame(c: string): void {
     }
     if (g.status === "playing" && g.turnIndex !== lastTurnIndex) {
       lastTurnIndex = g.turnIndex;
-      localQuestion = null;
       teardownRound();
       let prevStatus: RoundDoc["status"] | null = null;
       unsubRound = subscribeRound(c, g.turnIndex, (r) => {
@@ -192,16 +186,8 @@ function setCode(c: string): void {
   watchGame(c);
 }
 
-function nameOf(uid: string): string {
-  return players.find((p) => p.uid === uid)?.name ?? "?";
-}
-
 function avatarOf(uid: string): string {
   return players.find((p) => p.uid === uid)?.avatar ?? "❔";
-}
-
-function tagOf(uid: string): string {
-  return `${avatarOf(uid)} ${escapeHtml(nameOf(uid))}`;
 }
 
 function escapeHtml(s: string): string {
@@ -776,7 +762,7 @@ function renderLobby(): void {
           ? `<button id="startGame" ${g.topics.length < 1 ? "disabled" : ""}>
               ${players.length < 2 ? "🎮 תצוגה מקדימה (לבד)" : "התחל משחק"}
             </button>
-            ${players.length < 2 ? "<p class='hint small'>משחק לבד — אתה גם שואל וגם עונה.</p>" : ""}
+            ${players.length < 2 ? "<p class='hint small'>משחק לבד — תענו בעצמכם ותבדקו את המשחק.</p>" : ""}
             ${g.topics.length < 1 ? "<p class='hint small'>בחרו לפחות קטגוריה אחת</p>" : ""}`
           : "<p class='hint'>ממתינים שהמארח יתחיל…</p>"
       }
@@ -816,11 +802,7 @@ function renderLobby(): void {
     });
 
     app.querySelector("#startGame")!.addEventListener("click", async () => {
-      const order = buildOrder(
-        players.map((p) => p.uid),
-        g.totalQuestions ?? DEFAULT_TOTAL_QUESTIONS,
-      );
-      await startGame(g.code, order);
+      await startGame(g.code, g.topics);
     });
   }
 
@@ -896,7 +878,7 @@ function renderPlaying(): void {
   const g = game!;
   const r = round;
   const myScore = players.find((p) => p.uid === myUid)?.score ?? 0;
-  const amAsker = r?.askerUid === myUid;
+  const isHost = g.hostUid === myUid;
   const myAnswer = answers.find((a) => a.uid === myUid);
   const scoreboard = renderScoreboardRows(players, myUid);
   const oldRects = captureRects(".scoreboard .score-row");
@@ -907,34 +889,8 @@ function renderPlaying(): void {
   let headingAnim: { key: string; variant: TextAnim } | null = null;
   if (!r) {
     main = "<p>טוען סיבוב…</p>";
-  } else if (r.status === "asking") {
-    headingAnim = { key: `asking:${g.turnIndex}:${amAsker}`, variant: "write" };
-    if (amAsker) {
-      const categoryOptions = g.topics
-        .map((key) => `<button class="pick-category" data-category="${key}">${escapeHtml(getCategory(key)?.label ?? key)}</button>`)
-        .join("");
-      main = `
-        <h1>התור שלך לשאול!</h1>
-        <p class="hint">בחרו קטגוריה, קראו את השאלה בקול, ואז התחילו כדי שכולם יראו את האפשרויות.</p>
-        <div class="topic-picker">${categoryOptions}</div>
-        ${
-          localQuestion
-            ? `<div class="question-reveal">
-                <p class="hint">${escapeHtml(getCategory(localQuestion.categoryKey)?.label ?? "")}</p>
-                <p class="question-text">${escapeHtml(localQuestion.text)}</p>
-                ${renderChoiceGrid(localQuestion.choices, localQuestion.correctIndex, null, true, undefined, true)}
-              </div>
-              <button id="startQuestion" class="primary big">קראתי — התחילו!</button>`
-            : ""
-        }
-      `;
-    } else {
-      main = `
-        <h1>${tagOf(r.askerUid)} שואל/ת…</h1>
-        <p class="hint">התכוננו לענות!</p>
-      `;
-    }
   } else if (r.status === "question") {
+    headingAnim = { key: `question:${g.turnIndex}`, variant: "write" };
     const categoryLabel = r.categoryKey ? getCategory(r.categoryKey)?.label : undefined;
     const questionText =
       r.categoryKey && r.questionId ? getQuestion(r.categoryKey, r.questionId)?.q : undefined;
@@ -950,29 +906,17 @@ function renderPlaying(): void {
     const sky = renderSky(pct / 100);
     const breatheDelay = ((Date.now() / 1000) % 3.2).toFixed(3);
     const breatheStyle = ` style="animation-delay:-${breatheDelay}s"`;
-    const soloPreview = amAsker && players.length === 1;
     mainExtraClass = " sky-active";
-    if (amAsker && !soloPreview) {
-      main = `
-        ${sky}
-        <h1${breatheStyle}>מי יענה נכון?</h1>
-        ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
-        ${questionText ? `<p class="question-text">${escapeHtml(questionText)}</p>` : ""}
-        ${timerBar}
-        ${renderChoiceGrid(r.choices ?? [], null, null, true)}
-        <p class="hint">${answers.length} מתוך ${Math.max(players.length - 1, 0)} ענו</p>
-      `;
-    } else {
-      const choiceIndex = myAnswer ? myAnswer.choiceIndex : (myPendingChoice ?? null);
-      main = `
-        ${sky}
-        <h1${breatheStyle}>${soloPreview ? "תצוגה מקדימה — ענה בעצמך" : `${tagOf(r.askerUid)} שאל/ה שאלה`}</h1>
-        ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
-        ${questionText ? `<p class="question-text">${escapeHtml(questionText)}</p>` : ""}
-        ${timerBar}
-        ${renderChoiceGrid(r.choices ?? [], null, choiceIndex, choiceIndex !== null, elapsed)}
-      `;
-    }
+    const choiceIndex = myAnswer ? myAnswer.choiceIndex : (myPendingChoice ?? null);
+    main = `
+      ${sky}
+      <h1${breatheStyle}>מי עונה נכון?</h1>
+      ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
+      ${questionText ? `<p class="question-text">${escapeHtml(questionText)}</p>` : ""}
+      ${timerBar}
+      ${renderChoiceGrid(r.choices ?? [], null, choiceIndex, choiceIndex !== null, elapsed)}
+      <p class="hint">${answers.length} מתוך ${players.length} ענו</p>
+    `;
   } else if (r.status === "done") {
     headingAnim = { key: `done:${g.turnIndex}`, variant: "explode" };
     const category = r.categoryKey ? getCategory(r.categoryKey) : undefined;
@@ -982,14 +926,14 @@ function renderPlaying(): void {
     const myCorrect = r.correctIndex !== null && myAnswer && myAnswer.choiceIndex === r.correctIndex;
     const myEarnedPts = myCorrect && myAnswer ? calcPoints(myAnswer.elapsedMs, currentQuestionDurationMs) : 0;
     main = `
-      <h1>${amAsker ? "התוצאות!" : `${tagOf(r.askerUid)} שאל/ה`}</h1>
+      <h1>התוצאות!</h1>
       ${categoryLabel ? `<p class="hint">${escapeHtml(categoryLabel)}</p>` : ""}
       ${questionText ? `<p class="question-text">${escapeHtml(questionText)}</p>` : ""}
       ${myEarnedPts > 0 ? `<div class="points-burst" id="pointsBurst">+${myEarnedPts} 🎉</div>` : ""}
       ${renderChoiceGrid(r.choices ?? [], r.correctIndex, myAnswer ? myAnswer.choiceIndex : null, true, undefined, true)}
       ${renderAnswerResults(answers, r.correctIndex)}
       ${
-        amAsker
+        isHost
           ? `<button id="nextQuestion" class="primary big">לשאלה הבאה</button>`
           : "<p class='hint'>ממתינים לשאלה הבאה…</p>"
       }
@@ -1023,30 +967,7 @@ function renderPlaying(): void {
     fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2, 36);
   }
 
-  app.querySelectorAll<HTMLButtonElement>(".pick-category").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const categoryKey = btn.dataset.category!;
-      const question = pickRandomQuestion(categoryKey, g.usedQuestions);
-      if (!question) return;
-      const { choices, correctIndex } = shuffledChoices(question);
-      localQuestion = { categoryKey, questionId: question.id, text: question.q, choices, correctIndex };
-      render();
-    });
-  });
-
-  app.querySelector("#startQuestion")?.addEventListener("click", async () => {
-    if (!localQuestion) return;
-    await startQuestion(
-      g.code,
-      g.turnIndex,
-      localQuestion.categoryKey,
-      localQuestion.questionId,
-      localQuestion.choices,
-      localQuestion.correctIndex,
-    );
-  });
-
-  if (r?.status === "question" && (!amAsker || players.length === 1)) {
+  if (r?.status === "question") {
     app.querySelectorAll<HTMLButtonElement>(".choice-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
         if (myAnswer || myPendingChoice !== null) return;
