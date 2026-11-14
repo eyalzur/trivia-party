@@ -1181,6 +1181,10 @@ function renderAnswerResults(list: Answer[], correctIndex: number | null): strin
 function renderEnded(): void {
   app.innerHTML = `
     <div class="screen ended">
+      <div class="topbar">
+        <button id="leaveGame" class="home-btn" type="button" aria-label="יציאה">🏠</button>
+        <span class="topbar-title">&nbsp;</span>
+      </div>
       <h1>🏆 המשחק נגמר!</h1>
       ${renderScoreboardRows(players, myUid)}
       <button id="again">משחק חדש</button>
@@ -1188,6 +1192,7 @@ function renderEnded(): void {
   `;
   maybeAnimateHeading(`ended:${game?.code ?? ""}`, ".ended h1", "drop");
   app.querySelector("#again")!.addEventListener("click", leaveGame);
+  app.querySelector("#leaveGame")!.addEventListener("click", leaveGame);
   const gameKey = game?.code ?? "";
   if (gameKey && celebratedEndedGame !== gameKey) {
     celebratedEndedGame = gameKey;
