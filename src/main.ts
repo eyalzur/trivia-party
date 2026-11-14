@@ -625,6 +625,12 @@ function renderProfileEditor(): void {
     localStorage.setItem(LS_AVATAR, myAvatar);
     hadSavedPlayer = true;
     editingProfile = false;
+    const urlCode = new URLSearchParams(location.search).get("code")?.toUpperCase() ?? "";
+    if (urlCode) {
+      homeStep = "join";
+      void autoJoinFlow(urlCode);
+      return;
+    }
     render();
   });
 }
